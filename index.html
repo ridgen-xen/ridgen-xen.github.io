@@ -1,608 +1,227 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Шахтер Online</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .login-screen {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 50px;
-            border-radius: 20px;
-            text-align: center;
-            min-width: 400px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        }
-
-        .login-screen h1 {
-            font-size: 48px;
-            color: white;
-            margin-bottom: 10px;
-        }
-
-        .login-screen p {
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 20px;
-        }
-
-        .login-screen input {
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            border: 3px solid #ffd700;
-            border-radius: 10px;
-            font-size: 16px;
-        }
-
-        .login-screen button {
-            width: 100%;
-            padding: 16px;
-            margin-top: 20px;
-            background: #ffd700;
-            border: none;
-            border-radius: 10px;
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .login-screen button:hover {
-            background: #ffed4e;
-        }
-
-        .error {
-            color: #ff6b6b;
-            margin-top: 15px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .game-wrapper {
-            display: none;
-            width: 100%;
-            max-width: 1400px;
-            gap: 30px;
-            padding: 20px;
-        }
-
-        .game-wrapper.show {
-            display: flex;
-        }
-
-        .game-section {
-            flex: 1;
-        }
-
-        .game-container {
-            width: 100%;
-            height: 500px;
-            background: linear-gradient(to bottom, #87ceeb 0%, #e8d5c4 50%, #8b7355 100%);
-            border: 5px solid #5d4037;
-            position: relative;
-            overflow: hidden;
-            border-radius: 10px;
-        }
-
-        .soil {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 150px;
-            background: linear-gradient(to bottom, #8b6f47 0%, #5d3a1a 100%);
-        }
-
-        #miner {
-            position: absolute;
-            bottom: 160px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 60px;
-            z-index: 10;
-        }
-
-        .ore {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 35px;
-            border: 3px solid;
-        }
-
-        .ore-gold {
-            background: radial-gradient(circle at 30% 30%, #ffd700, #ffa500);
-            border-color: #ff8c00;
-        }
-
-        .ore-silver {
-            background: radial-gradient(circle at 30% 30%, #f0f0f0, #c0c0c0);
-            border-color: #a8a8a8;
-        }
-
-        .ore-copper {
-            background: radial-gradient(circle at 30% 30%, #dd7e50, #8b4513);
-            border-color: #6b3410;
-        }
-
-        .ore-diamond {
-            background: radial-gradient(circle at 30% 30%, #00ffff, #0088ff);
-            border-color: #0055ff;
-        }
-
-        .ui {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
-            z-index: 20;
-        }
-
-        .info {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-            margin-bottom: 10px;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .ore-counter {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px 15px;
-            border-radius: 10px;
-            color: white;
-            font-size: 14px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        #gameOver {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            display: none;
-            z-index: 100;
-            border: 3px solid #ffd700;
-        }
-
-        #gameOver h1 {
-            font-size: 40px;
-            color: #ffd700;
-            margin-bottom: 20px;
-        }
-
-        #gameOver .results {
-            background: rgba(100, 100, 100, 0.5);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-            text-align: left;
-        }
-
-        #gameOver button {
-            padding: 12px 25px;
-            font-size: 16px;
-            background: #ffd700;
-            color: #333;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-top: 10px;
-            margin-right: 10px;
-        }
-
-        #gameOver button:hover {
-            background: #ffed4e;
-        }
-
-        #gameOver button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .leaderboard-section {
-            width: 300px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 15px;
-            padding: 20px;
-            color: white;
-            max-height: 700px;
-            overflow-y: auto;
-        }
-
-        .leaderboard-section h2 {
-            color: #ffd700;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .leaderboard-item {
-            padding: 10px;
-            margin-bottom: 10px;
-            background: rgba(255, 215, 0, 0.1);
-            border-left: 3px solid #ffd700;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .leaderboard-item.current {
-            background: rgba(0, 255, 150, 0.2);
-            border-left-color: #00ff96;
-        }
-
-        .floating-text {
-            position: absolute;
-            font-weight: bold;
-            pointer-events: none;
-            animation: float-up 1s ease-out forwards;
-        }
-
-        @keyframes float-up {
-            0% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            100% {
-                opacity: 0;
-                transform: translateY(-50px);
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Шахтер Online</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .game-area {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #leaderboard ol {
+      text-align: left;
+      max-width: 300px;
+      margin: 10px auto;
+      list-style-type: decimal;
+    }
+    .hidden { display: none; }
+    h1 { margin-top: 0; }
+  </style>
 </head>
 <body>
 
-<div class="login-screen" id="loginScreen">
-    <h1>⛏️ ШАХТЕР</h1>
-    <p>Online Edition</p>
-    <input type="text" id="nameInput" placeholder="Введи своё имя..." maxlength="20">
-    <button id="playBtn">Начать игру</button>
-    <div class="error" id="errorMsg"></div>
-</div>
+<div class="game-area">
+  <h1>⛏️ ШАХТЕР</h1>
+  <p><strong>Online Edition</strong></p>
 
-<div class="game-wrapper" id="gameWrapper">
-    <div class="game-section">
-        <div class="game-container" id="gameContainer">
-            <div class="soil"></div>
-            <div id="miner">🧑‍🏭</div>
-            
-            <div class="ui">
-                <div class="info">👤 <span id="playerName"></span> | 💰 <span id="score">0</span></div>
-                <div class="ore-counter">
-                    <div>🟨 Золото: <span id="goldCount">0</span></div>
-                    <div>⚪ Серебро: <span id="silverCount">0</span></div>
-                    <div>🟠 Медь: <span id="copperCount">0</span></div>
-                    <div>💎 Алмазы: <span id="diamondCount">0</span></div>
-                </div>
-            </div>
+  <!-- Экран игры -->
+  <div id="screen-game">
+    <p>Начать игру</p>
+    <button id="btn-start">🧑‍🏭 Начать</button>
+    <p id="stats" class="hidden">
+      👤 Имя: <span id="player-name">—</span> | 💰 <span id="score">0</span><br>
+      🟨 Золото: <span id="gold">0</span> |
+      ⚪ Серебро: <span id="silver">0</span> |
+      🟠 Медь: <span id="copper">0</span> |
+      💎 Алмазы: <span id="diamonds">0</span>
+    </p>
+  </div>
 
-            <div id="gameOver">
-                <h1>⛏️ ИГРА ОКОНЧЕНА!</h1>
-                <div class="results">
-                    <p>💰 Финальный счет: <span id="finalScore">0</span></p>
-                    <p>🟨 Золото: <span id="finalGold">0</span></p>
-                    <p>⚪ Серебро: <span id="finalSilver">0</span></p>
-                    <p>🟠 Медь: <span id="finalCopper">0</span></p>
-                    <p>💎 Алмазы: <span id="finalDiamond">0</span></p>
-                </div>
-                <button onclick="location.reload()">🔄 Новая игра</button>
-                <button id="submitBtn" disabled>⏳ Отправка...</button>
-            </div>
-        </div>
-    </div>
+  <!-- Экран окончания -->
+  <div id="screen-end" class="hidden">
+    <h2>⛏️ ИГРА ОКОНЧЕНА!</h2>
+    <p>💰 Финальный счет: <span id="final-score">0</span></p>
+    <p>🟨 Золото: <span id="final-gold">0</span></p>
+    <p>⚪ Серебро: <span id="final-silver">0</span></p>
+    <p>🟠 Медь: <span id="final-copper">0</span></p>
+    <p>💎 Алмазы: <span id="final-diamonds">0</span></p>
+    <button id="btn-submit">📤 Отправить результат</button>
+    <button id="btn-restart-end">🔄 Новая игра</button>
+    <p id="submit-status" class="hidden">⏳ Отправка...</p>
+  </div>
 
-    <div class="leaderboard-section">
-        <h2>🌍 ТАБЛИЦА ЛИДЕРОВ</h2>
-        <div id="leaderboardList">⏳ Загрузка...</div>
-        <button id="refreshBtn" style="width: 100%; padding: 10px; margin-top: 15px; background: #ffd700; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;">🔄 Обновить</button>
-    </div>
+  <!-- Таблица лидеров -->
+  <div id="leaderboard-section">
+    <h3>🏆 ОБЛАЧНЫЕ ЛИДЕРЫ</h3>
+    <div id="leaderboard">⏳ Загрузка...</div>
+    <button id="btn-refresh">🔄 Обновить</button>
+  </div>
 </div>
 
 <script>
-// === ОБЛАКО ЧЕРЕЗ localStorage (РАБОТАЕТ МЕЖДУ БРАУЗЕРАМИ ТЬ ОДНОГО ПК) ===
-// Для полной синхронизации через интернет нужен сервер
+  // === КОНФИГУРАЦИЯ ===
+  const API_URL = 'http://104.128.135.170:3000/api';
 
-const STORAGE_KEY = 'minerGameScores';
+  // Состояние
+  let gameState = {
+    score: 0,
+    gold: 0,
+    silver: 0,
+    copper: 0,
+    diamonds: 0,
+    name: ''
+  };
 
-let playerName = '';
-let score = 0;
-let gameActive = false;
-let oreCount = { gold: 0, silver: 0, copper: 0, diamond: 0 };
-let mouseX = 0;
-let difficulty = 1;
-let oresCreated = 0;
+  // DOM
+  const screenGame = document.getElementById('screen-game');
+  const screenEnd = document.getElementById('screen-end');
+  const statsEl = document.getElementById('stats');
+  const btnStart = document.getElementById('btn-start');
+  const btnSubmit = document.getElementById('btn-submit');
+  const btnRestartEnd = document.getElementById('btn-restart-end');
+  const btnRefresh = document.getElementById('btn-refresh');
 
-const badWords = ['блядь', 'ебать', 'хуй', 'сука', 'пизда', 'черт', 'дерьмо', 'гавно'];
+  // Финальные значения
+  const finalScoreEl = document.getElementById('final-score');
+  const finalGoldEl = document.getElementById('final-gold');
+  const finalSilverEl = document.getElementById('final-silver');
+  const finalCopperEl = document.getElementById('final-copper');
+  const finalDiamondsEl = document.getElementById('final-diamonds');
+  const submitStatusEl = document.getElementById('submit-status');
 
-function hasBadWords(text) {
-    const lower = text.toLowerCase();
-    return badWords.some(word => lower.includes(word));
-}
+  // === ФУНКЦИИ ===
+  function updateStats() {
+    document.getElementById('score').textContent = gameState.score;
+    document.getElementById('gold').textContent = gameState.gold;
+    document.getElementById('silver').textContent = gameState.silver;
+    document.getElementById('copper').textContent = gameState.copper;
+    document.getElementById('diamonds').textContent = gameState.diamonds;
+    document.getElementById('player-name').textContent = gameState.name || '—';
+  }
 
-// === ЗАГРУЗ��А ТАБЛИЦЫ ЛИДЕРОВ ===
-function loadLeaderboard() {
+  async function loadLeaders() {
     try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        const leaderboard = data ? JSON.parse(data) : [];
-        displayLeaderboard(leaderboard);
-    } catch (e) {
-        console.log('Ошибка загрузки:', e);
-        displayLeaderboard([]);
+      const res = await fetch(API_URL + '/leaders');
+      if (!res.ok) throw new Error('Ошибка сети');
+      const leaders = await res.json();
+      const leaderboardEl = document.getElementById('leaderboard');
+      if (leaders.length === 0) {
+        leaderboardEl.innerHTML = '<p>ещё нет лидеров</p>';
+      } else {
+        let html = '<ol>';
+        leaders.forEach(p => {
+          html += `<li>${p.name} — ${p.score} очков</li>`;
+        });
+        html += '</ol>';
+        leaderboardEl.innerHTML = html;
+      }
+    } catch (err) {
+      document.getElementById('leaderboard').innerHTML = '<p style="color:red">❌ Не удалось загрузить</p>';
     }
-}
+  }
 
-function displayLeaderboard(leaderboard) {
-    const list = document.getElementById('leaderboardList');
-    list.innerHTML = '';
-    
-    if (!leaderboard || !leaderboard.length) {
-        list.innerHTML = '<p style="color: #ffd700; text-align: center;">Таблица пуста 📭</p>';
-        return;
-    }
-    
-    // Сортируем и показываем ТОП-15
-    leaderboard.sort((a, b) => b.score - a.score).slice(0, 15).forEach((entry, i) => {
-        const div = document.createElement('div');
-        div.className = 'leaderboard-item';
-        if (entry.name === playerName) div.classList.add('current');
-        const medal = ['🥇', '🥈', '🥉'][i] || `${i+1}.`;
-        div.innerHTML = `<strong>${medal}</strong> ${entry.name} - 💰 ${entry.score}`;
-        list.appendChild(div);
-    });
-}
-
-document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
-
-// === ОТПРАВКА РЕЗУЛЬТАТА ===
-function submitScore() {
-    if (score === 0) {
-        alert('Счет не может быть 0!');
-        return;
-    }
-    
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = '⏳ Отправляю...';
-    
+  async function submitResult() {
+    submitStatusEl.classList.remove('hidden');
     try {
-        // Получаем текущую таблицу
-        const data = localStorage.getItem(STORAGE_KEY);
-        let leaderboard = data ? JSON.parse(data) : [];
-        
-        // Ищем игрока
-        const idx = leaderboard.findIndex(p => p.name === playerName);
-        
-        if (idx >= 0) {
-            // Обновляем если результат лучше
-            if (score > leaderboard[idx].score) {
-                leaderboard[idx].score = score;
-            }
-        } else {
-            // Добавляем нового игрока
-            leaderboard.push({
-                name: playerName,
-                score: score,
-                date: new Date().toLocaleString('ru-RU')
-            });
-        }
-        
-        // Сохраняем
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
-        
-        submitBtn.disabled = false;
-        submitBtn.textContent = '✅ Сохранено!';
-        submitBtn.style.background = '#00ff96';
-        alert('🎉 Результат сохранён!\n\n💡 Совет: открой игру в другом браузере\nи вы увидите друг друга в таблице лидеров!');
-        
-        // Обновляем таблицу
-        loadLeaderboard();
-    } catch (e) {
-        console.error('Ошибка:', e);
-        submitBtn.disabled = false;
-        submitBtn.textContent = '❌ Ошибка!';
-        submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Ошибка при сохранении');
+      const res = await fetch(API_URL + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: gameState.name,
+          score: gameState.score,
+          gold: gameState.gold,
+          silver: gameState.silver,
+          copper: gameState.copper,
+          diamonds: gameState.diamonds
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        submitStatusEl.textContent = '✅ Сохранено!';
+        loadLeaders(); // обновить лидеров
+      } else {
+        submitStatusEl.textContent = '❌ Ошибка: ' + (data.error || 'неизвестно');
+      }
+    } catch (err) {
+      submitStatusEl.textContent = '🚫 Нет связи с сервером';
     }
-}
+  }
 
-document.getElementById('submitBtn').addEventListener('click', submitScore);
+  // === ИМИТАЦИЯ ИГРЫ (замените на вашу логику) ===
+  function simulateGame() {
+    // Здесь должна быть ваша реальная игровая логика
+    // Пока — простая симуляция
+    gameState.score = Math.floor(Math.random() * 1000) + 50;
+    gameState.gold = Math.floor(Math.random() * 20);
+    gameState.silver = Math.floor(Math.random() * 30);
+    gameState.copper = Math.floor(Math.random() * 50);
+    gameState.diamonds = Math.floor(Math.random() * 5);
 
-// === КНОПКА СТАРТ ===
-document.getElementById('playBtn').addEventListener('click', function() {
-    const input = document.getElementById('nameInput').value.trim();
-    
-    if (!input) {
-        showError('Введи имя!');
-        return;
-    }
-    
-    if (input.length < 2) {
-        showError('Имя должно быть минимум 2 символа!');
-        return;
-    }
-    
-    if (hasBadWords(input)) {
-        showError('Используй приличное имя!');
-        return;
-    }
-    
-    playerName = input;
-    document.getElementById('playerName').textContent = playerName;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('gameWrapper').classList.add('show');
-    
-    loadLeaderboard();
-    startGameLoop();
-});
+    // Показать финальные значения
+    finalScoreEl.textContent = gameState.score;
+    finalGoldEl.textContent = gameState.gold;
+    finalSilverEl.textContent = gameState.silver;
+    finalCopperEl.textContent = gameState.copper;
+    finalDiamondsEl.textContent = gameState.diamonds;
 
-function showError(msg) {
-    const err = document.getElementById('errorMsg');
-    err.textContent = msg;
-    err.style.display = 'block';
-    setTimeout(() => err.style.display = 'none', 3000);
-}
+    // Переключить экран
+    screenGame.classList.add('hidden');
+    screenEnd.classList.remove('hidden');
+  }
 
-// === ИГРОВАЯ ЛОГИКА ===
-const gameContainer = document.getElementById('gameContainer');
-const miner = document.getElementById('miner');
+  // === ОБРАБОТЧИКИ ===
+  btnStart.onclick = () => {
+    const name = prompt('Введите ваше имя (до 20 символов):');
+    if (!name || name.trim() === '') return alert('Имя обязательно!');
+    if (name.length > 20) return alert('Слишком длинное имя!');
+    gameState.name = name.trim();
+    statsEl.classList.remove('hidden');
+    updateStats();
+    setTimeout(simulateGame, 1000); // имитация игры
+  };
 
-document.addEventListener('mousemove', (e) => {
-    if (gameActive) {
-        const rect = gameContainer.getBoundingClientRect();
-        mouseX = e.clientX - rect.left - 30;
-        mouseX = Math.max(0, Math.min(mouseX, rect.width - 60));
-        miner.style.left = mouseX + 'px';
-    }
-});
+  btnSubmit.onclick = () => {
+    if (!gameState.name) return alert('Сначала начните игру!');
+    submitResult();
+  };
 
-function createOre() {
-    if (!gameActive) return;
-    
-    const oreTypes = ['gold', 'silver', 'copper', 'diamond'];
-    const weights = [40, 30, 25, 5];
-    let random = Math.random() * 100;
-    let type = 'gold';
-    let w = 0;
-    
-    for (let i = 0; i < oreTypes.length; i++) {
-        w += weights[i];
-        if (random < w) {
-            type = oreTypes[i];
-            break;
-        }
-    }
-    
-    const ore = document.createElement('div');
-    ore.className = `ore ore-${type}`;
-    const emojis = { gold: '🟨', silver: '⚪', copper: '🟠', diamond: '💎' };
-    ore.textContent = emojis[type];
-    
-    const startX = Math.random() * (gameContainer.offsetWidth - 50);
-    ore.style.left = startX + 'px';
-    ore.style.top = '-60px';
-    gameContainer.appendChild(ore);
-    
-    let oreY = -60;
-    const speed = 3 + difficulty * 0.5;
-    
-    const interval = setInterval(() => {
-        oreY += speed;
-        ore.style.top = oreY + 'px';
-        
-        if (checkCollision(startX, oreY, mouseX)) {
-            clearInterval(interval);
-            ore.remove();
-            mineOre(type);
-        }
-        
-        if (oreY > gameContainer.offsetHeight) {
-            clearInterval(interval);
-            ore.remove();
-            endGame();
-        }
-    }, 30);
-    
-    oresCreated++;
-    difficulty = Math.floor(oresCreated / 20) + 1;
-    
-    if (gameActive) {
-        setTimeout(createOre, Math.max(500, 1500 - difficulty * 100));
-    }
-}
+  btnRestartEnd.onclick = () => {
+    screenEnd.classList.add('hidden');
+    screenGame.classList.remove('hidden');
+    gameState = { score: 0, gold: 0, silver: 0, copper: 0, diamonds: 0, name: '' };
+    statsEl.classList.add('hidden');
+  };
 
-function checkCollision(oreX, oreY, minerX) {
-    return oreX > minerX - 40 && oreX < minerX + 60 && oreY > gameContainer.offsetHeight - 200;
-}
+  btnRefresh.onclick = loadLeaders;
 
-function mineOre(type) {
-    const values = { gold: 50, silver: 30, copper: 20, diamond: 100 };
-    score += values[type];
-    oreCount[type]++;
-    
-    document.getElementById('score').textContent = score;
-    document.getElementById(`${type}Count`).textContent = oreCount[type];
-    
-    const floatText = document.createElement('div');
-    floatText.className = 'floating-text';
-    floatText.textContent = `+${values[type]}`;
-    floatText.style.left = mouseX + 'px';
-    floatText.style.top = (gameContainer.offsetHeight - 250) + 'px';
-    const colors = { gold: '#ffd700', silver: '#e8e8e8', copper: '#ff8c00', diamond: '#00d9ff' };
-    floatText.style.color = colors[type];
-    gameContainer.appendChild(floatText);
-    setTimeout(() => floatText.remove(), 1000);
-}
-
-function endGame() {
-    gameActive = false;
-    document.getElementById('gameOver').style.display = 'block';
-    document.getElementById('finalScore').textContent = score;
-    document.getElementById('finalGold').textContent = oreCount.gold;
-    document.getElementById('finalSilver').textContent = oreCount.silver;
-    document.getElementById('finalCopper').textContent = oreCount.copper;
-    document.getElementById('finalDiamond').textContent = oreCount.diamond;
-    
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = false;
-    submitBtn.textContent = '📤 Отправить результат';
-    submitBtn.style.background = '#ffd700';
-}
-
-function startGameLoop() {
-    gameActive = true;
-    score = 0;
-    oreCount = { gold: 0, silver: 0, copper: 0, diamond: 0 };
-    difficulty = 1;
-    oresCreated = 0;
-    
-    document.getElementById('score').textContent = '0';
-    document.getElementById('goldCount').textContent = '0';
-    document.getElementById('silverCount').textContent = '0';
-    document.getElementById('copperCount').textContent = '0';
-    document.getElementById('diamondCount').textContent = '0';
-    document.getElementById('gameOver').style.display = 'none';
-    
-    createOre();
-}
-
-document.getElementById('nameInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') document.getElementById('playBtn').click();
-});
-
-// Загружаем таблицу при загрузке
-window.addEventListener('load', () => {
-    loadLeaderboard();
-    // Обновляем таблицу каждые 2 секунды
-    setInterval(loadLeaderboard, 2000);
-});
+  // Загрузка при старте
+  loadLeaders();
 </script>
 
 </body>
