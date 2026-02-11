@@ -228,6 +228,11 @@
             background: #ffed4e;
         }
 
+        #gameOver button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .leaderboard-section {
             width: 300px;
             background: rgba(0, 0, 0, 0.7);
@@ -294,7 +299,7 @@
             <div id="miner">🧑‍🏭</div>
             
             <div class="ui">
-                <div class="info">👤 <span id="playerName"></span> | 💰 <span id="score">0</span> | 🏆 <span id="highScore">0</span></div>
+                <div class="info">👤 <span id="playerName"></span> | 💰 <span id="score">0</span></div>
                 <div class="ore-counter">
                     <div>🟨 Золото: <span id="goldCount">0</span></div>
                     <div>⚪ Серебро: <span id="silverCount">0</span></div>
@@ -311,36 +316,34 @@
                     <p>⚪ Серебро: <span id="finalSilver">0</span></p>
                     <p>🟠 Медь: <span id="finalCopper">0</span></p>
                     <p>💎 Алмазы: <span id="finalDiamond">0</span></p>
-                    <p style="color: #ffd700;">🏆 Рекорд: <span id="finalHighScore">0</span></p>
                 </div>
                 <button onclick="location.reload()">🔄 Новая игра</button>
-                <button id="submitBtn">📤 Отправить результат</button>
+                <button id="submitBtn" disabled>⏳ Отправка...</button>
             </div>
         </div>
     </div>
 
     <div class="leaderboard-section">
-        <h2>🏆 ЛИДЕРЫ</h2>
-        <div id="leaderboardList"></div>
+        <h2>🏆 ОБЛАЧНЫЕ ЛИДЕРЫ</h2>
+        <div id="leaderboardList">⏳ Загрузка...</div>
         <button id="refreshBtn" style="width: 100%; padding: 10px; margin-top: 15px; background: #ffd700; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;">🔄 Обновить</button>
     </div>
 </div>
 
 <script>
+// === ОБЛАЧНОЕ ХРАНИЛИЩЕ ===
 const JSONBIN_BIN_ID = '698ce862d0ea881f40b30597';
 const JSONBIN_MASTER_KEY = '$2a$10$ojG7T2rVPC4xUy41UkErVu1VW37UscK87WriZRNqnYQzgq0kt0M8G';
 const JSONBIN_URL = `https://jsonbin.io/api/v3/b/${JSONBIN_BIN_ID}`;
 
 let playerName = '';
 let score = 0;
-let highScore = 0;
 let gameActive = false;
 let oreCount = { gold: 0, silver: 0, copper: 0, diamond: 0 };
 let mouseX = 0;
 let difficulty = 1;
 let oresCreated = 0;
 
-// ИСПРАВЛЕННЫЙ ФИЛЬТР - БЕЗ ОШИБКИ REGEX
 const badWords = ['блядь', 'ебать', 'хуй', 'сука', 'пизда', 'черт', 'дерьмо', 'гавно'];
 
 function hasBadWords(text) {
@@ -348,7 +351,7 @@ function hasBadWords(text) {
     return badWords.some(word => lower.includes(word));
 }
 
-// === ОБРАБОТЧИК КНОПКИ ===
+// === КНОПКА СТАРТ ===
 document.getElementById('playBtn').addEventListener('click', function() {
     const input = document.getElementById('nameInput').value.trim();
     
@@ -372,7 +375,6 @@ document.getElementById('playBtn').addEventListener('click', function() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('gameWrapper').classList.add('show');
     
-    loadHighScore();
     loadLeaderboard();
     startGameLoop();
 });
@@ -384,15 +386,7 @@ function showError(msg) {
     setTimeout(() => err.style.display = 'none', 3000);
 }
 
-function loadHighScore() {
-    const saved = localStorage.getItem(`miner_${playerName}`);
-    if (saved) {
-        highScore = parseInt(saved);
-        document.getElementById('highScore').textContent = highScore;
-        document.getElementById('finalHighScore').textContent = highScore;
-    }
-}
-
+// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ ОБЛАКА ===
 async function loadLeaderboard() {
     try {
         const response = await fetch(JSONBIN_URL, {
@@ -406,24 +400,22 @@ async function loadLeaderboard() {
             const data = await response.json();
             const leaderboard = data.record || [];
             displayLeaderboard(leaderboard);
-            localStorage.setItem('minerLeaderboard', JSON.stringify(leaderboard));
         } else {
-            const local = JSON.parse(localStorage.getItem('minerLeaderboard') || '[]');
-            displayLeaderboard(local);
+            document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Ошибка загрузки</p>';
         }
     } catch (e) {
-        console.log('Ошибка загрузки лидеров:', e);
-        const local = JSON.parse(localStorage.getItem('minerLeaderboard') || '[]');
-        displayLeaderboard(local);
+        console.error('Ошибка:', e);
+        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Нет интернета</p>';
     }
 }
 
+// === ПОКАЗ ТАБЛИЦЫ ЛИДЕРОВ ===
 function displayLeaderboard(leaderboard) {
     const list = document.getElementById('leaderboardList');
     list.innerHTML = '';
     
     if (!leaderboard.length) {
-        list.innerHTML = '<p style="color: #ffd700; text-align: center;">Пока нет результатов</p>';
+        list.innerHTML = '<p style="color: #ffd700; text-align: center;">Пока пусто 📭</p>';
         return;
     }
     
@@ -439,31 +431,47 @@ function displayLeaderboard(leaderboard) {
 
 document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
 
+// === ОТПРАВКА РЕЗУЛЬТАТА В ОБЛАКО ===
 async function submitScore() {
     if (score === 0) {
-        alert('Нельзя отправить 0 очков!');
+        alert('Счет не может быть 0!');
         return;
     }
     
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Отправляю...';
+    
     try {
-        let leaderboard = [];
+        // 1. Получаем текущую таблицу
         const response = await fetch(JSONBIN_URL, {
             method: 'GET',
             headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
         });
         
+        let leaderboard = [];
         if (response.ok) {
             const data = await response.json();
             leaderboard = data.record || [];
         }
         
+        // 2. Обновляем или добавляем результ��т
         const idx = leaderboard.findIndex(p => p.name === playerName);
         if (idx >= 0) {
-            if (score > leaderboard[idx].score) leaderboard[idx].score = score;
+            // Если игрок есть - обновляем только если новый результат лучше
+            if (score > leaderboard[idx].score) {
+                leaderboard[idx].score = score;
+            }
         } else {
-            leaderboard.push({ name: playerName, score: score });
+            // Новый игрок - добавляем в таблицу
+            leaderboard.push({ 
+                name: playerName, 
+                score: score,
+                timestamp: new Date().toISOString()
+            });
         }
         
+        // 3. Отправляем обновленную таблицу в облако
         const putResponse = await fetch(JSONBIN_URL, {
             method: 'PUT',
             headers: {
@@ -474,24 +482,21 @@ async function submitScore() {
         });
         
         if (putResponse.ok) {
-            localStorage.setItem('minerLeaderboard', JSON.stringify(leaderboard));
-            alert('✅ Результат отправлен в облако!');
+            // Успех!
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ Отправлено!';
+            submitBtn.style.background = '#00ff96';
+            alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
             loadLeaderboard();
         } else {
-            throw new Error('Ошибка отправки');
+            throw new Error('Ошибка сервера: ' + putResponse.status);
         }
     } catch (e) {
-        console.log('Ошибка:', e);
-        let leaderboard = JSON.parse(localStorage.getItem('minerLeaderboard') || '[]');
-        const idx = leaderboard.findIndex(p => p.name === playerName);
-        if (idx >= 0) {
-            if (score > leaderboard[idx].score) leaderboard[idx].score = score;
-        } else {
-            leaderboard.push({ name: playerName, score: score });
-        }
-        localStorage.setItem('minerLeaderboard', JSON.stringify(leaderboard));
-        alert('✅ Результат сохранён локально!');
-        loadLeaderboard();
+        console.error('Ошибка отправки:', e);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '❌ Ошибка!';
+        submitBtn.style.background = '#ff6b6b';
+        alert('⚠️ Ошибка при отправке результата:\n' + e.message);
     }
 }
 
@@ -597,11 +602,11 @@ function endGame() {
     document.getElementById('finalCopper').textContent = oreCount.copper;
     document.getElementById('finalDiamond').textContent = oreCount.diamond;
     
-    if (score > highScore) {
-        highScore = score;
-        localStorage.setItem(`miner_${playerName}`, highScore);
-        document.getElementById('finalHighScore').textContent = highScore;
-    }
+    // Активируем кнопку отправки
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '📤 Отправить в облако';
+    submitBtn.style.background = '#ffd700';
 }
 
 function startGameLoop() {
