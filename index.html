@@ -67,10 +67,6 @@
             background: #ffed4e;
         }
 
-        .login-screen button:active {
-            transform: scale(0.98);
-        }
-
         .error {
             color: #ff6b6b;
             margin-top: 15px;
@@ -330,23 +326,11 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
 <script>
-// === FIREBASE ИНИЦИАЛИЗАЦИЯ ===
-const firebaseConfig = {
-    apiKey: "AIzaSyDlZ8YW0J8qKmx5N9pQ4R3S2T1U0V9W8X7Y",
-    authDomain: "miner-game-ridgen.firebaseapp.com",
-    projectId: "miner-game-ridgen",
-    storageBucket: "miner-game-ridgen.appspot.com",
-    messagingSenderId: "123456789012",
-    databaseURL: "https://miner-game-ridgen-default-rtdb.firebaseio.com",
-    appId: "1:123456789012:web:abcdef1234567890"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const leaderboardRef = db.ref('leaderboard');
+// === ПРОСТОЕ ОБЛАЧНОЕ ХРАНИЛИЩЕ (БЕЗ FIREBASE) ===
+// Используем простой API для сохранения результатов
+const API_URL = 'https://api.jsonbin.io/v3/b/698ce862d0ea881f40b30597';
+const API_KEY = '$2a$10$ojG7T2rVPC4xUy41UkErVu1VW37UscK87WriZRNqnYQzgq0kt0M8G';
 
 let playerName = '';
 let score = 0;
@@ -365,6 +349,7 @@ function hasBadWords(text) {
 
 // === КНОПКА СТАРТ ===
 document.getElementById('playBtn').addEventListener('click', function() {
+    console.log('Кнопка нажата');
     const input = document.getElementById('nameInput').value.trim();
     
     if (!input) {
@@ -398,17 +383,13 @@ function showError(msg) {
     setTimeout(() => err.style.display = 'none', 3000);
 }
 
-// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ FIREBASE ===
+// === ЗАГРУЗКА ТАБЛИЦЫ ЛИДЕРОВ (ЛОКАЛЬНО) ===
 async function loadLeaderboard() {
     try {
-        leaderboardRef.once('value', (snapshot) => {
-            const data = snapshot.val();
-            const leaderboard = data ? Object.values(data) : [];
-            displayLeaderboard(leaderboard);
-        });
+        const localData = JSON.parse(localStorage.getItem('minerScores') || '[]');
+        displayLeaderboard(localData);
     } catch (e) {
-        console.error('Ошибка:', e);
-        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Ошибка загрузки</p>';
+        console.log('Ошибка загрузки:', e);
     }
 }
 
@@ -434,7 +415,7 @@ function displayLeaderboard(leaderboard) {
 
 document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
 
-// === ОТПРАВКА РЕЗУЛЬТАТА В FIREBASE ===
+// === ОТПРАВКА РЕЗУЛЬТАТА ===
 async function submitScore() {
     if (score === 0) {
         alert('Счет не может быть 0!');
@@ -446,28 +427,54 @@ async function submitScore() {
     submitBtn.textContent = '⏳ Отправляю...';
     
     try {
-        // Создаём уникальный ID для записи
-        const entryKey = playerName.replace(/[^a-z0-9]/gi, '');
+        // Загружаем текущие результаты
+        let localScores = JSON.parse(localStorage.getItem('minerScores') || '[]');
         
-        leaderboardRef.child(entryKey).set({
-            name: playerName,
-            score: score,
-            timestamp: new Date().toISOString()
-        }).then(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✅ Отправлено!';
-            submitBtn.style.background = '#00ff96';
-            alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
-            loadLeaderboard();
-        }).catch((error) => {
-            throw error;
-        });
+        // Ищем игрока
+        const playerIdx = localScores.findIndex(p => p.name === playerName);
+        
+        if (playerIdx >= 0) {
+            // Обновляем если новый результат лучше
+            if (score > localScores[playerIdx].score) {
+                localScores[playerIdx].score = score;
+            }
+        } else {
+            // Добавляем нового игрока
+            localScores.push({
+                name: playerName,
+                score: score,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Сохраняем локально
+        localStorage.setItem('minerScores', JSON.stringify(localScores));
+        
+        // Пытаемся отправить на сервер (опционально)
+        try {
+            await fetch(API_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify(localScores)
+            });
+            submitBtn.textContent = '✅ Отправлено в облако!';
+        } catch (e) {
+            console.log('Облако не доступно, результат сохранён локально');
+            submitBtn.textContent = '✅ Сохранено локально';
+        }
+        
+        submitBtn.style.background = '#00ff96';
+        alert('🎉 Результат сохранён!\nТебя видно на таблице лидеров!');
+        loadLeaderboard();
     } catch (e) {
-        console.error('Ошибка отправки:', e);
+        console.error('Ошибка:', e);
         submitBtn.disabled = false;
         submitBtn.textContent = '❌ Ошибка!';
         submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Не удалось отправить результат:\n' + e.message);
+        alert('⚠️ Ошибка при сохранении: ' + e.message);
     }
 }
 
@@ -575,7 +582,7 @@ function endGame() {
     
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = false;
-    submitBtn.textContent = '📤 Отправить в облако';
+    submitBtn.textContent = '📤 Отправить результат';
     submitBtn.style.background = '#ffd700';
 }
 
@@ -598,6 +605,11 @@ function startGameLoop() {
 
 document.getElementById('nameInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') document.getElementById('playBtn').click();
+});
+
+// Автозагрузка таблицы при загрузке страницы
+window.addEventListener('load', () => {
+    loadLeaderboard();
 });
 </script>
 
