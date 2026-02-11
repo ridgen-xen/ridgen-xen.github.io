@@ -330,14 +330,23 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
 <script>
-// === ОБЛАЧНОЕ ХРАНИЛИЩЕ С ПРОКСИ ===
-const JSONBIN_BIN_ID = '698ce862d0ea881f40b30597';
-const JSONBIN_MASTER_KEY = '$2a$10$ojG7T2rVPC4xUy41UkErVu1VW37UscK87WriZRNqnYQzgq0kt0M8G';
+// === FIREBASE ИНИЦИАЛИЗАЦИЯ ===
+const firebaseConfig = {
+    apiKey: "AIzaSyDlZ8YW0J8qKmx5N9pQ4R3S2T1U0V9W8X7Y",
+    authDomain: "miner-game-ridgen.firebaseapp.com",
+    projectId: "miner-game-ridgen",
+    storageBucket: "miner-game-ridgen.appspot.com",
+    messagingSenderId: "123456789012",
+    databaseURL: "https://miner-game-ridgen-default-rtdb.firebaseio.com",
+    appId: "1:123456789012:web:abcdef1234567890"
+};
 
-// Используем CORS прокси
-const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
-const JSONBIN_URL = `https://jsonbin.io/api/v3/b/${JSONBIN_BIN_ID}`;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const leaderboardRef = db.ref('leaderboard');
 
 let playerName = '';
 let score = 0;
@@ -389,27 +398,17 @@ function showError(msg) {
     setTimeout(() => err.style.display = 'none', 3000);
 }
 
-// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ ОБЛАКА ===
+// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ FIREBASE ===
 async function loadLeaderboard() {
     try {
-        const response = await fetch(JSONBIN_URL, {
-            method: 'GET',
-            headers: { 
-                'X-Master-Key': JSONBIN_MASTER_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const leaderboard = data.record || [];
+        leaderboardRef.once('value', (snapshot) => {
+            const data = snapshot.val();
+            const leaderboard = data ? Object.values(data) : [];
             displayLeaderboard(leaderboard);
-        } else {
-            document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Ошибка загрузки</p>';
-        }
+        });
     } catch (e) {
         console.error('Ошибка:', e);
-        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ffd700;">⚠️ Автономный режим</p>';
+        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Ошибка загрузки</p>';
     }
 }
 
@@ -435,7 +434,7 @@ function displayLeaderboard(leaderboard) {
 
 document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
 
-// === ОТПРАВКА РЕЗУЛЬТАТА В ОБЛАКО ===
+// === ОТПРАВКА РЕЗУЛЬТАТА В FIREBASE ===
 async function submitScore() {
     if (score === 0) {
         alert('Счет не может быть 0!');
@@ -447,60 +446,28 @@ async function submitScore() {
     submitBtn.textContent = '⏳ Отправляю...';
     
     try {
-        // 1. Получаем текущую таблицу
-        const response = await fetch(JSONBIN_URL, {
-            method: 'GET',
-            headers: { 
-                'X-Master-Key': JSONBIN_MASTER_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Создаём уникальный ID для записи
+        const entryKey = playerName.replace(/[^a-z0-9]/gi, '');
         
-        let leaderboard = [];
-        if (response.ok) {
-            const data = await response.json();
-            leaderboard = data.record || [];
-        }
-        
-        // 2. Обновляем или добавляем результат
-        const idx = leaderboard.findIndex(p => p.name === playerName);
-        if (idx >= 0) {
-            if (score > leaderboard[idx].score) {
-                leaderboard[idx].score = score;
-            }
-        } else {
-            leaderboard.push({ 
-                name: playerName, 
-                score: score,
-                timestamp: new Date().toISOString()
-            });
-        }
-        
-        // 3. Отправляем обновленную таблицу в облако
-        const putResponse = await fetch(JSONBIN_URL, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': JSONBIN_MASTER_KEY
-            },
-            body: JSON.stringify(leaderboard)
-        });
-        
-        if (putResponse.ok) {
+        leaderboardRef.child(entryKey).set({
+            name: playerName,
+            score: score,
+            timestamp: new Date().toISOString()
+        }).then(() => {
             submitBtn.disabled = false;
             submitBtn.textContent = '✅ Отправлено!';
             submitBtn.style.background = '#00ff96';
             alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
             loadLeaderboard();
-        } else {
-            throw new Error('Ошибка: ' + putResponse.status);
-        }
+        }).catch((error) => {
+            throw error;
+        });
     } catch (e) {
         console.error('Ошибка отправки:', e);
         submitBtn.disabled = false;
         submitBtn.textContent = '❌ Ошибка!';
         submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Не удалось отправить результат:\n' + e.message + '\n\nПроверь интернет и попробуй снова.');
+        alert('⚠️ Не удалось отправить результат:\n' + e.message);
     }
 }
 
