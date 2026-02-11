@@ -331,9 +331,12 @@
 </div>
 
 <script>
-// === ОБЛАЧНОЕ ХРАНИЛИЩЕ ===
+// === ОБЛАЧНОЕ ХРАНИЛИЩЕ С ПРОКСИ ===
 const JSONBIN_BIN_ID = '698ce862d0ea881f40b30597';
 const JSONBIN_MASTER_KEY = '$2a$10$ojG7T2rVPC4xUy41UkErVu1VW37UscK87WriZRNqnYQzgq0kt0M8G';
+
+// Используем CORS прокси
+const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
 const JSONBIN_URL = `https://jsonbin.io/api/v3/b/${JSONBIN_BIN_ID}`;
 
 let playerName = '';
@@ -392,7 +395,8 @@ async function loadLeaderboard() {
         const response = await fetch(JSONBIN_URL, {
             method: 'GET',
             headers: { 
-                'X-Master-Key': JSONBIN_MASTER_KEY
+                'X-Master-Key': JSONBIN_MASTER_KEY,
+                'Content-Type': 'application/json'
             }
         });
         
@@ -405,7 +409,7 @@ async function loadLeaderboard() {
         }
     } catch (e) {
         console.error('Ошибка:', e);
-        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ff6b6b;">❌ Нет интернета</p>';
+        document.getElementById('leaderboardList').innerHTML = '<p style="color: #ffd700;">⚠️ Автономный режим</p>';
     }
 }
 
@@ -446,7 +450,10 @@ async function submitScore() {
         // 1. Получаем текущую таблицу
         const response = await fetch(JSONBIN_URL, {
             method: 'GET',
-            headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
+            headers: { 
+                'X-Master-Key': JSONBIN_MASTER_KEY,
+                'Content-Type': 'application/json'
+            }
         });
         
         let leaderboard = [];
@@ -455,15 +462,13 @@ async function submitScore() {
             leaderboard = data.record || [];
         }
         
-        // 2. Обновляем или добавляем результ��т
+        // 2. Обновляем или добавляем результат
         const idx = leaderboard.findIndex(p => p.name === playerName);
         if (idx >= 0) {
-            // Если игрок есть - обновляем только если новый результат лучше
             if (score > leaderboard[idx].score) {
                 leaderboard[idx].score = score;
             }
         } else {
-            // Новый игрок - добавляем в таблицу
             leaderboard.push({ 
                 name: playerName, 
                 score: score,
@@ -482,21 +487,20 @@ async function submitScore() {
         });
         
         if (putResponse.ok) {
-            // Успех!
             submitBtn.disabled = false;
             submitBtn.textContent = '✅ Отправлено!';
             submitBtn.style.background = '#00ff96';
             alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
             loadLeaderboard();
         } else {
-            throw new Error('Ошибка сервера: ' + putResponse.status);
+            throw new Error('Ошибка: ' + putResponse.status);
         }
     } catch (e) {
         console.error('Ошибка отправки:', e);
         submitBtn.disabled = false;
         submitBtn.textContent = '❌ Ошибка!';
         submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Ошибка при отправке результата:\n' + e.message);
+        alert('⚠️ Не удалось отправить результат:\n' + e.message + '\n\nПроверь интернет и попробуй снова.');
     }
 }
 
@@ -602,7 +606,6 @@ function endGame() {
     document.getElementById('finalCopper').textContent = oreCount.copper;
     document.getElementById('finalDiamond').textContent = oreCount.diamond;
     
-    // Активируем кнопку отправки
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = false;
     submitBtn.textContent = '📤 Отправить в облако';
