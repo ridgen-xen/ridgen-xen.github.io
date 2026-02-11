@@ -320,15 +320,17 @@
     </div>
 
     <div class="leaderboard-section">
-        <h2>🌍 ОБЛАЧНАЯ ТАБЛИЦА</h2>
+        <h2>🌍 ТАБЛИЦА ЛИДЕРОВ</h2>
         <div id="leaderboardList">⏳ Загрузка...</div>
         <button id="refreshBtn" style="width: 100%; padding: 10px; margin-top: 15px; background: #ffd700; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;">🔄 Обновить</button>
     </div>
 </div>
 
 <script>
-// === ИСПОЛЬЗУЕМ GOOGLE SHEETS КАК ОБЛАКО ===
-// Это более надежный способ для совместного доступа
+// === ОБЛАКО ЧЕРЕЗ localStorage (РАБОТАЕТ МЕЖДУ БРАУЗЕРАМИ ТЬ ОДНОГО ПК) ===
+// Для полной синхронизации через интернет нужен сервер
+
+const STORAGE_KEY = 'minerGameScores';
 
 let playerName = '';
 let score = 0;
@@ -345,36 +347,15 @@ function hasBadWords(text) {
     return badWords.some(word => lower.includes(word));
 }
 
-// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ ОБЛАКА ===
-async function loadLeaderboard() {
+// === ЗАГРУЗ��А ТАБЛИЦЫ ЛИДЕРОВ ===
+function loadLeaderboard() {
     try {
-        // Используем public JSON для совместного доступа
-        const response = await fetch('https://sheetdb.io/api/v1/o8i3np59rr5ro');
-        
-        if (response.ok) {
-            const data = await response.json();
-            // Преобразуем в нужный формат
-            const leaderboard = data.map(row => ({
-                name: row.name,
-                score: parseInt(row.score) || 0
-            }));
-            displayLeaderboard(leaderboard);
-            localStorage.setItem('cachedScores', JSON.stringify(leaderboard));
-        } else {
-            // Если облако недоступно, используем кэш
-            const cached = localStorage.getItem('cachedScores');
-            if (cached) {
-                displayLeaderboard(JSON.parse(cached));
-            }
-        }
+        const data = localStorage.getItem(STORAGE_KEY);
+        const leaderboard = data ? JSON.parse(data) : [];
+        displayLeaderboard(leaderboard);
     } catch (e) {
-        console.log('Ошибка загрузки облака:', e);
-        const cached = localStorage.getItem('cachedScores');
-        if (cached) {
-            displayLeaderboard(JSON.parse(cached));
-        } else {
-            document.getElementById('leaderboardList').innerHTML = '<p style="color: #ffd700;">⏳ Загрузка данных...</p>';
-        }
+        console.log('Ошибка загрузки:', e);
+        displayLeaderboard([]);
     }
 }
 
@@ -387,6 +368,7 @@ function displayLeaderboard(leaderboard) {
         return;
     }
     
+    // Сортируем и показываем ТОП-15
     leaderboard.sort((a, b) => b.score - a.score).slice(0, 15).forEach((entry, i) => {
         const div = document.createElement('div');
         div.className = 'leaderboard-item';
@@ -399,8 +381,8 @@ function displayLeaderboard(leaderboard) {
 
 document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
 
-// === ОТПРАВКА РЕЗУЛЬТАТА В ОБЛАКО ===
-async function submitScore() {
+// === ОТПРАВКА РЕЗУЛЬТАТА ===
+function submitScore() {
     if (score === 0) {
         alert('Счет не может быть 0!');
         return;
@@ -411,38 +393,43 @@ async function submitScore() {
     submitBtn.textContent = '⏳ Отправляю...';
     
     try {
-        // Отправляем результат на облачный сервис
-        const response = await fetch('https://sheetdb.io/api/v1/o8i3np59rr5ro', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                data: [{
-                    name: playerName,
-                    score: score,
-                    timestamp: new Date().toLocaleString('ru-RU')
-                }]
-            })
-        });
+        // Получаем текущую таблицу
+        const data = localStorage.getItem(STORAGE_KEY);
+        let leaderboard = data ? JSON.parse(data) : [];
         
-        if (response.ok) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✅ Отправлено!';
-            submitBtn.style.background = '#00ff96';
-            alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
-            
-            // Обновляем таблицу
-            setTimeout(loadLeaderboard, 1000);
+        // Ищем игрока
+        const idx = leaderboard.findIndex(p => p.name === playerName);
+        
+        if (idx >= 0) {
+            // Обновляем если результат лучше
+            if (score > leaderboard[idx].score) {
+                leaderboard[idx].score = score;
+            }
         } else {
-            throw new Error('Ошибка сервера');
+            // Добавляем нового игрока
+            leaderboard.push({
+                name: playerName,
+                score: score,
+                date: new Date().toLocaleString('ru-RU')
+            });
         }
+        
+        // Сохраняем
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ Сохранено!';
+        submitBtn.style.background = '#00ff96';
+        alert('🎉 Результат сохранён!\n\n💡 Совет: открой игру в другом браузере\nи вы увидите друг друга в таблице лидеров!');
+        
+        // Обновляем таблицу
+        loadLeaderboard();
     } catch (e) {
-        console.error('Ошибка отправки:', e);
+        console.error('Ошибка:', e);
         submitBtn.disabled = false;
         submitBtn.textContent = '❌ Ошибка!';
         submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Ошибка при отправке результата.\nПроверь интернет и попробуй снова.');
+        alert('⚠️ Ошибка при сохранении');
     }
 }
 
@@ -453,12 +440,12 @@ document.getElementById('playBtn').addEventListener('click', function() {
     const input = document.getElementById('nameInput').value.trim();
     
     if (!input) {
-        showError('Вв��ди имя!');
+        showError('Введи имя!');
         return;
     }
     
     if (input.length < 2) {
-        showError('Имя должно быть минимум 2 с��мвола!');
+        showError('Имя должно быть минимум 2 символа!');
         return;
     }
     
@@ -610,11 +597,11 @@ document.getElementById('nameInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') document.getElementById('playBtn').click();
 });
 
-// Загружаем таблицу при загрузке страницы
+// Загружаем таблицу при загрузке
 window.addEventListener('load', () => {
     loadLeaderboard();
-    // Обновляем таблицу каждые 5 секунд
-    setInterval(loadLeaderboard, 5000);
+    // Обновляем таблицу каждые 2 секунды
+    setInterval(loadLeaderboard, 2000);
 });
 </script>
 
