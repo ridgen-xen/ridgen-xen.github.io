@@ -320,17 +320,15 @@
     </div>
 
     <div class="leaderboard-section">
-        <h2>🏆 ОБЛАЧНЫЕ ЛИДЕРЫ</h2>
+        <h2>🌍 ОБЛАЧНАЯ ТАБЛИЦА</h2>
         <div id="leaderboardList">⏳ Загрузка...</div>
         <button id="refreshBtn" style="width: 100%; padding: 10px; margin-top: 15px; background: #ffd700; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;">🔄 Обновить</button>
     </div>
 </div>
 
 <script>
-// === ПРОСТОЕ ОБЛАЧНОЕ ХРАНИЛИЩЕ (БЕЗ FIREBASE) ===
-// Используем простой API для сохранения результатов
-const API_URL = 'https://api.jsonbin.io/v3/b/698ce862d0ea881f40b30597';
-const API_KEY = '$2a$10$ojG7T2rVPC4xUy41UkErVu1VW37UscK87WriZRNqnYQzgq0kt0M8G';
+// === ИСПОЛЬЗУЕМ GOOGLE SHEETS КАК ОБЛАКО ===
+// Это более надежный способ для совместного доступа
 
 let playerName = '';
 let score = 0;
@@ -347,18 +345,120 @@ function hasBadWords(text) {
     return badWords.some(word => lower.includes(word));
 }
 
+// === ЗАГРУЗКА ТАБЛИЦЫ ИЗ ОБЛАКА ===
+async function loadLeaderboard() {
+    try {
+        // Используем public JSON для совместного доступа
+        const response = await fetch('https://sheetdb.io/api/v1/o8i3np59rr5ro');
+        
+        if (response.ok) {
+            const data = await response.json();
+            // Преобразуем в нужный формат
+            const leaderboard = data.map(row => ({
+                name: row.name,
+                score: parseInt(row.score) || 0
+            }));
+            displayLeaderboard(leaderboard);
+            localStorage.setItem('cachedScores', JSON.stringify(leaderboard));
+        } else {
+            // Если облако недоступно, используем кэш
+            const cached = localStorage.getItem('cachedScores');
+            if (cached) {
+                displayLeaderboard(JSON.parse(cached));
+            }
+        }
+    } catch (e) {
+        console.log('Ошибка загрузки облака:', e);
+        const cached = localStorage.getItem('cachedScores');
+        if (cached) {
+            displayLeaderboard(JSON.parse(cached));
+        } else {
+            document.getElementById('leaderboardList').innerHTML = '<p style="color: #ffd700;">⏳ Загрузка данных...</p>';
+        }
+    }
+}
+
+function displayLeaderboard(leaderboard) {
+    const list = document.getElementById('leaderboardList');
+    list.innerHTML = '';
+    
+    if (!leaderboard || !leaderboard.length) {
+        list.innerHTML = '<p style="color: #ffd700; text-align: center;">Таблица пуста 📭</p>';
+        return;
+    }
+    
+    leaderboard.sort((a, b) => b.score - a.score).slice(0, 15).forEach((entry, i) => {
+        const div = document.createElement('div');
+        div.className = 'leaderboard-item';
+        if (entry.name === playerName) div.classList.add('current');
+        const medal = ['🥇', '🥈', '🥉'][i] || `${i+1}.`;
+        div.innerHTML = `<strong>${medal}</strong> ${entry.name} - 💰 ${entry.score}`;
+        list.appendChild(div);
+    });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
+
+// === ОТПРАВКА РЕЗУЛЬТАТА В ОБЛАКО ===
+async function submitScore() {
+    if (score === 0) {
+        alert('Счет не может быть 0!');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Отправляю...';
+    
+    try {
+        // Отправляем результат на облачный сервис
+        const response = await fetch('https://sheetdb.io/api/v1/o8i3np59rr5ro', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                data: [{
+                    name: playerName,
+                    score: score,
+                    timestamp: new Date().toLocaleString('ru-RU')
+                }]
+            })
+        });
+        
+        if (response.ok) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✅ Отправлено!';
+            submitBtn.style.background = '#00ff96';
+            alert('🎉 Результат загружен в облако!\nТебя видно на таблице лидеров!');
+            
+            // Обновляем таблицу
+            setTimeout(loadLeaderboard, 1000);
+        } else {
+            throw new Error('Ошибка сервера');
+        }
+    } catch (e) {
+        console.error('Ошибка отправки:', e);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '❌ Ошибка!';
+        submitBtn.style.background = '#ff6b6b';
+        alert('⚠️ Ошибка при отправке результата.\nПроверь интернет и попробуй снова.');
+    }
+}
+
+document.getElementById('submitBtn').addEventListener('click', submitScore);
+
 // === КНОПКА СТАРТ ===
 document.getElementById('playBtn').addEventListener('click', function() {
-    console.log('Кнопка нажата');
     const input = document.getElementById('nameInput').value.trim();
     
     if (!input) {
-        showError('Введи имя!');
+        showError('Вв��ди имя!');
         return;
     }
     
     if (input.length < 2) {
-        showError('Имя должно быть минимум 2 символа!');
+        showError('Имя должно быть минимум 2 с��мвола!');
         return;
     }
     
@@ -382,103 +482,6 @@ function showError(msg) {
     err.style.display = 'block';
     setTimeout(() => err.style.display = 'none', 3000);
 }
-
-// === ЗАГРУЗКА ТАБЛИЦЫ ЛИДЕРОВ (ЛОКАЛЬНО) ===
-async function loadLeaderboard() {
-    try {
-        const localData = JSON.parse(localStorage.getItem('minerScores') || '[]');
-        displayLeaderboard(localData);
-    } catch (e) {
-        console.log('Ошибка загрузки:', e);
-    }
-}
-
-// === ПОКАЗ ТАБЛИЦЫ ЛИДЕРОВ ===
-function displayLeaderboard(leaderboard) {
-    const list = document.getElementById('leaderboardList');
-    list.innerHTML = '';
-    
-    if (!leaderboard.length) {
-        list.innerHTML = '<p style="color: #ffd700; text-align: center;">Пока пусто 📭</p>';
-        return;
-    }
-    
-    leaderboard.sort((a, b) => b.score - a.score).slice(0, 15).forEach((entry, i) => {
-        const div = document.createElement('div');
-        div.className = 'leaderboard-item';
-        if (entry.name === playerName) div.classList.add('current');
-        const medal = ['🥇', '🥈', '🥉'][i] || `${i+1}.`;
-        div.innerHTML = `<strong>${medal}</strong> ${entry.name} - 💰 ${entry.score}`;
-        list.appendChild(div);
-    });
-}
-
-document.getElementById('refreshBtn').addEventListener('click', loadLeaderboard);
-
-// === ОТПРАВКА РЕЗУЛЬТАТА ===
-async function submitScore() {
-    if (score === 0) {
-        alert('Счет не может быть 0!');
-        return;
-    }
-    
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = '⏳ Отправляю...';
-    
-    try {
-        // Загружаем текущие результаты
-        let localScores = JSON.parse(localStorage.getItem('minerScores') || '[]');
-        
-        // Ищем игрока
-        const playerIdx = localScores.findIndex(p => p.name === playerName);
-        
-        if (playerIdx >= 0) {
-            // Обновляем если новый результат лучше
-            if (score > localScores[playerIdx].score) {
-                localScores[playerIdx].score = score;
-            }
-        } else {
-            // Добавляем нового игрока
-            localScores.push({
-                name: playerName,
-                score: score,
-                timestamp: new Date().toISOString()
-            });
-        }
-        
-        // Сохраняем локально
-        localStorage.setItem('minerScores', JSON.stringify(localScores));
-        
-        // Пытаемся отправить на сервер (опционально)
-        try {
-            await fetch(API_URL, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': API_KEY
-                },
-                body: JSON.stringify(localScores)
-            });
-            submitBtn.textContent = '✅ Отправлено в облако!';
-        } catch (e) {
-            console.log('Облако не доступно, результат сохранён локально');
-            submitBtn.textContent = '✅ Сохранено локально';
-        }
-        
-        submitBtn.style.background = '#00ff96';
-        alert('🎉 Результат сохранён!\nТебя видно на таблице лидеров!');
-        loadLeaderboard();
-    } catch (e) {
-        console.error('Ошибка:', e);
-        submitBtn.disabled = false;
-        submitBtn.textContent = '❌ Ошибка!';
-        submitBtn.style.background = '#ff6b6b';
-        alert('⚠️ Ошибка при сохранении: ' + e.message);
-    }
-}
-
-document.getElementById('submitBtn').addEventListener('click', submitScore);
 
 // === ИГРОВАЯ ЛОГИКА ===
 const gameContainer = document.getElementById('gameContainer');
@@ -607,9 +610,11 @@ document.getElementById('nameInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') document.getElementById('playBtn').click();
 });
 
-// Автозагрузка таблицы при загрузке страницы
+// Загружаем таблицу при загрузке страницы
 window.addEventListener('load', () => {
     loadLeaderboard();
+    // Обновляем таблицу каждые 5 секунд
+    setInterval(loadLeaderboard, 5000);
 });
 </script>
 
