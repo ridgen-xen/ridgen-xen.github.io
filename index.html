@@ -1,1915 +1,718 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-    />
-    <meta name="theme-color" content="#176b87" />
-    <title>Кусочки — собери пазл</title>
-    <style>
-      :root {
-        color-scheme: light;
-        --ink: #18323b;
-        --muted: #5c737b;
-        --paper: #f4f8f7;
-        --panel: #ffffff;
-        --line: #cbdcdd;
-        --sea: #176b87;
-        --sea-dark: #0e526b;
-        --lime: #d9ed75;
-        --shadow: 0 12px 34px rgba(19, 64, 76, 0.14);
-        --radius: 22px;
-      }
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#f6d7bd">
+  <title>Sushi Tower Stack</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Trebuchet MS", "Arial Rounded MT Bold", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+    body { background: #f7dfc9; touch-action: none; user-select: none; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #hud {
+      position: fixed;
+      z-index: 3;
+      inset: max(12px, env(safe-area-inset-top)) 0 auto;
+      color: #452b28;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 2px 0 rgba(255,255,255,.55);
+    }
+    #score { font-size: clamp(34px, 10vw, 54px); font-weight: 900; line-height: .95; letter-spacing: -2px; }
+    #level { margin-top: 6px; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; opacity: .72; }
+    #power {
+      display: inline-block;
+      min-height: 26px;
+      margin-top: 9px;
+      padding: 5px 11px;
+      border: 1px solid rgba(69,43,40,.15);
+      border-radius: 99px;
+      background: rgba(255,255,255,.58);
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0;
+      transform: translateY(-5px);
+      transition: opacity .25s, transform .25s;
+      backdrop-filter: blur(5px);
+    }
+    #power.show { opacity: 1; transform: translateY(0); }
+    #message {
+      position: fixed;
+      z-index: 4;
+      left: 50%; top: 27%;
+      transform: translate(-50%, 10px) scale(.9);
+      color: #fff;
+      font-size: clamp(24px, 8vw, 42px);
+      font-weight: 1000;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      text-shadow: 0 3px 0 #ba4a4a, 0 7px 22px rgba(83,36,29,.32);
+    }
+    #message.pop { animation: pop .85s cubic-bezier(.2,.85,.25,1); }
+    @keyframes pop {
+      0% { opacity: 0; transform: translate(-50%, 14px) scale(.75); }
+      22%, 68% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -24px) scale(1.08); }
+    }
+    .screen {
+      position: fixed;
+      z-index: 10;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+      background: linear-gradient(165deg, rgba(255,247,232,.35), rgba(245,190,166,.3));
+      transition: opacity .3s, visibility .3s;
+    }
+    .screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .card {
+      width: min(100%, 390px);
+      padding: 34px 26px 27px;
+      border: 1px solid rgba(83,45,38,.12);
+      border-radius: 30px;
+      background: rgba(255,251,242,.88);
+      box-shadow: 0 24px 80px rgba(103,55,42,.18), inset 0 1px #fff;
+      text-align: center;
+      backdrop-filter: blur(12px);
+    }
+    .stamp {
+      display: grid;
+      place-items: center;
+      width: 67px; height: 67px;
+      margin: -3px auto 16px;
+      border: 4px solid #df5d59;
+      border-radius: 18px;
+      color: #df5d59;
+      font-size: 35px;
+      font-weight: 900;
+      transform: rotate(-5deg);
+    }
+    h1 { margin: 0; color: #34211f; font-size: clamp(37px, 12vw, 58px); line-height: .84; letter-spacing: -3px; }
+    h1 span { display: block; color: #df5d59; font-size: .62em; letter-spacing: 4px; text-transform: uppercase; }
+    .tagline { margin: 18px auto 24px; color: #7b615b; font-size: 14px; line-height: 1.5; }
+    .stats { display: flex; justify-content: center; gap: 26px; margin: 20px 0; color: #76534c; }
+    .stat b { display: block; color: #33211f; font-size: 25px; }
+    .stat small { font-size: 10px; font-weight: 800; letter-spacing: 1.3px; text-transform: uppercase; }
+    button {
+      width: 100%; min-height: 55px;
+      border: 0; border-radius: 17px;
+      background: #df5d59;
+      color: #fff;
+      font: 900 17px/1 inherit;
+      box-shadow: 0 7px 0 #b84445, 0 12px 22px rgba(184,68,69,.24);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button:active { transform: translateY(4px); box-shadow: 0 3px 0 #b84445; }
+    button.secondary { margin-top: 13px; background: #f0dfcc; color: #5c403a; box-shadow: 0 6px 0 #d5baa3; }
+    .hint { margin: 18px 0 0; color: #9a7e76; font-size: 11px; }
+    #gameover h2 { margin: 0; color: #392421; font-size: 38px; letter-spacing: -2px; }
+    #shareStatus { height: 18px; margin: 12px 0 -4px; color: #64814f; font-size: 12px; font-weight: 700; }
+    @media (max-height: 620px) {
+      .card { padding-top: 23px; padding-bottom: 22px; }
+      .stamp { width: 51px; height: 51px; margin-bottom: 11px; font-size: 27px; }
+      .tagline { margin: 12px 0 16px; }
+      .stats { margin: 13px 0; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Игровое поле Sushi Tower Stack"></canvas>
 
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-        overscroll-behavior: none;
-      }
-      body {
-        background: var(--paper);
-        color: var(--ink);
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-        -webkit-tap-highlight-color: transparent;
-      }
-      button,
-      input {
-        font: inherit;
-      }
-      button {
-        color: inherit;
-      }
-      button:focus-visible,
-      input:focus-visible {
-        outline: 3px solid var(--lime);
-        outline-offset: 3px;
-      }
+  <div id="hud" hidden>
+    <div id="score">0</div>
+    <div id="level">Этаж 1</div>
+    <div id="power"></div>
+  </div>
+  <div id="message"></div>
 
-      .screen {
-        position: fixed;
-        inset: 0;
-      }
-      .hidden {
-        display: none !important;
-      }
-
-      /* Start screen */
-      #startScreen {
-        overflow: auto;
-        padding: max(22px, env(safe-area-inset-top)) 18px
-          max(28px, env(safe-area-inset-bottom));
-        background:
-          radial-gradient(
-            circle at 92% 2%,
-            rgba(217, 237, 117, 0.72),
-            transparent 28%
-          ),
-          linear-gradient(155deg, #edf8f7 0%, #f8faf4 65%);
-      }
-      .start-shell {
-        width: min(100%, 1060px);
-        margin: 0 auto;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 24px;
-      }
-      .brand-mark {
-        display: grid;
-        place-items: center;
-        width: 48px;
-        height: 48px;
-        border-radius: 15px;
-        background: var(--sea);
-        color: white;
-        box-shadow: var(--shadow);
-        font-size: 26px;
-      }
-      .brand strong {
-        display: block;
-        font:
-          800 25px/1 "Arial Rounded MT Bold",
-          "Trebuchet MS",
-          sans-serif;
-        letter-spacing: -0.8px;
-      }
-      .brand span {
-        color: var(--muted);
-        font-size: 13px;
-      }
-      h1 {
-        margin: 0 0 8px;
-        max-width: 700px;
-        font:
-          800 clamp(32px, 8vw, 60px)/0.98 "Arial Rounded MT Bold",
-          "Trebuchet MS",
-          sans-serif;
-        letter-spacing: -2px;
-      }
-      .lead {
-        margin: 0 0 24px;
-        color: var(--muted);
-        font-size: 16px;
-        line-height: 1.45;
-      }
-      .section-title {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
-        margin: 24px 0 12px;
-      }
-      .section-title h2 {
-        margin: 0;
-        font-size: 17px;
-      }
-      .section-title span {
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .gallery {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-      }
-      .picture-card {
-        position: relative;
-        min-height: 116px;
-        padding: 0;
-        overflow: hidden;
-        border: 3px solid transparent;
-        border-radius: 18px;
-        background: #dbe8e8;
-        cursor: pointer;
-        box-shadow: 0 5px 15px rgba(19, 64, 76, 0.09);
-      }
-      .picture-card img {
-        width: 100%;
-        height: 100%;
-        min-height: 116px;
-        object-fit: cover;
-        display: block;
-      }
-      .picture-card span {
-        position: absolute;
-        left: 9px;
-        bottom: 9px;
-        padding: 5px 9px;
-        border-radius: 999px;
-        background: rgba(10, 37, 44, 0.76);
-        color: white;
-        font-size: 12px;
-      }
-      .picture-card[aria-pressed="true"] {
-        border-color: var(--sea);
-        transform: translateY(-2px);
-      }
-      .upload-card {
-        border: 2px dashed #83a6aa;
-        background: #e5f0ef;
-        color: var(--sea-dark);
-      }
-      .upload-card .upload-inner {
-        min-height: 112px;
-        display: grid;
-        place-content: center;
-        gap: 5px;
-        text-align: center;
-      }
-      .upload-card b {
-        font-size: 28px;
-        line-height: 1;
-      }
-      .upload-card small {
-        font-weight: 700;
-      }
-      #fileInput {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
-        pointer-events: none;
-      }
-      .difficulty {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(54px, 1fr));
-        gap: 7px;
-      }
-      .difficulty button {
-        min-height: 54px;
-        padding: 6px 2px;
-        border: 1px solid var(--line);
-        border-radius: 15px;
-        background: var(--panel);
-        cursor: pointer;
-      }
-      .difficulty button b {
-        display: block;
-        font-size: 17px;
-      }
-      .difficulty button small {
-        display: block;
-        margin-top: 2px;
-        color: var(--muted);
-        font-size: 9px;
-      }
-      .difficulty button[aria-pressed="true"] {
-        background: var(--sea);
-        color: white;
-        border-color: var(--sea);
-      }
-      .difficulty button[aria-pressed="true"] small {
-        color: #d9eef4;
-      }
-      .start-actions {
-        position: sticky;
-        bottom: 0;
-        padding-top: 18px;
-        background: linear-gradient(transparent, var(--paper) 25%);
-      }
-      .primary {
-        width: 100%;
-        min-height: 58px;
-        border: 0;
-        border-radius: 18px;
-        background: var(--sea);
-        color: white;
-        font-weight: 800;
-        font-size: 17px;
-        cursor: pointer;
-        box-shadow: 0 10px 22px rgba(23, 107, 135, 0.24);
-      }
-      .resume {
-        margin-top: 9px;
-        width: 100%;
-        min-height: 48px;
-        border: 1px solid var(--line);
-        border-radius: 15px;
-        background: white;
-        font-weight: 700;
-        cursor: pointer;
-      }
-
-      /* Game */
-      #gameScreen {
-        background: #dfe9e8;
-      }
-      .game-layout {
-        display: grid;
-        grid-template-rows: auto 1fr auto;
-        width: 100%;
-        min-width: 0;
-        height: 100%;
-        overflow: hidden;
-      }
-      .topbar {
-        z-index: 4;
-        display: grid;
-        grid-template-columns: 44px minmax(0, 1fr) 82px;
-        align-items: center;
-        gap: 8px;
-        padding: max(8px, env(safe-area-inset-top)) 10px 8px;
-        background: rgba(250, 252, 250, 0.94);
-        border-bottom: 1px solid var(--line);
-        backdrop-filter: blur(10px);
-        min-width: 0;
-      }
-      .icon-btn {
-        width: 44px;
-        height: 44px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: white;
-        font-size: 20px;
-        cursor: pointer;
-      }
-      .stats {
-        display: flex;
-        justify-content: center;
-        gap: 5px;
-        min-width: 0;
-      }
-      .stat {
-        min-width: 42px;
-        text-align: center;
-      }
-      .stat b {
-        display: block;
-        font-size: 15px;
-        line-height: 1.1;
-        font-variant-numeric: tabular-nums;
-      }
-      .stat small {
-        color: var(--muted);
-        font-size: 9px;
-        text-transform: uppercase;
-        letter-spacing: 0.7px;
-      }
-      .toolbar {
-        display: flex;
-        justify-content: flex-end;
-        gap: 4px;
-      }
-      .toolbar .icon-btn {
-        width: 39px;
-        height: 42px;
-      }
-      .board-wrap {
-        position: relative;
-        min-width: 0;
-        min-height: 0;
-        overflow: hidden;
-        background: #dfe9e8;
-      }
-      #puzzleCanvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        touch-action: none;
-        cursor: grab;
-      }
-      #puzzleCanvas.dragging {
-        cursor: grabbing;
-      }
-      .zoom-controls {
-        position: absolute;
-        right: 10px;
-        bottom: 10px;
-        display: grid;
-        gap: 6px;
-      }
-      .zoom-controls button {
-        width: 42px;
-        height: 42px;
-        border: 1px solid rgba(77, 106, 111, 0.25);
-        border-radius: 13px;
-        background: rgba(255, 255, 255, 0.9);
-        font-size: 20px;
-        box-shadow: 0 4px 12px rgba(20, 50, 60, 0.12);
-      }
-      .toast {
-        position: absolute;
-        left: 50%;
-        top: 14px;
-        z-index: 5;
-        transform: translateX(-50%) translateY(-10px);
-        padding: 9px 14px;
-        border-radius: 999px;
-        background: #18323b;
-        color: white;
-        opacity: 0;
-        pointer-events: none;
-        transition: 0.2s;
-        font-size: 13px;
-        white-space: nowrap;
-      }
-      .toast.show {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-      .tray {
-        z-index: 3;
-        min-width: 0;
-        min-height: 94px;
-        padding: 9px max(10px, env(safe-area-inset-right))
-          max(9px, env(safe-area-inset-bottom))
-          max(10px, env(safe-area-inset-left));
-        background: rgba(249, 252, 250, 0.97);
-        border-top: 1px solid var(--line);
-        overflow: hidden;
-      }
-      .tray-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 0 2px 7px;
-        font-size: 11px;
-        color: var(--muted);
-      }
-      .tray-list {
-        display: flex;
-        width: 100%;
-        min-width: 0;
-        gap: 8px;
-        overflow-x: auto;
-        scrollbar-width: none;
-        scroll-snap-type: x proximity;
-      }
-      .tray-list::-webkit-scrollbar {
-        display: none;
-      }
-      .piece-chip {
-        flex: 0 0 56px;
-        width: 56px;
-        height: 56px;
-        padding: 3px;
-        border: 1px solid var(--line);
-        border-radius: 13px;
-        background: #edf3f1;
-        scroll-snap-align: center;
-        cursor: pointer;
-        overflow: hidden;
-      }
-      .piece-chip canvas {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        pointer-events: none;
-      }
-      .piece-chip.joined {
-        opacity: 0.3;
-        filter: grayscale(1);
-      }
-
-      .original-overlay {
-        position: absolute;
-        inset: 0;
-        z-index: 8;
-        display: grid;
-        place-items: center;
-        padding: 20px;
-        background: rgba(10, 31, 37, 0.74);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.18s;
-      }
-      .original-overlay.show {
-        opacity: 1;
-      }
-      .original-overlay img {
-        max-width: 92%;
-        max-height: 88%;
-        object-fit: contain;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-      }
-
-      /* Victory */
-      .modal {
-        position: fixed;
-        inset: 0;
-        z-index: 20;
-        display: grid;
-        place-items: center;
-        padding: 18px;
-        background: rgba(12, 37, 43, 0.72);
-        backdrop-filter: blur(6px);
-      }
-      .victory-card {
-        position: relative;
-        width: min(100%, 430px);
-        overflow: hidden;
-        padding: 16px;
-        border-radius: 26px;
-        background: white;
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
-        text-align: center;
-      }
-      .victory-card img {
-        width: 100%;
-        max-height: 270px;
-        object-fit: cover;
-        border-radius: 17px;
-      }
-      .victory-card h2 {
-        margin: 18px 0 5px;
-        font:
-          800 30px/1 "Arial Rounded MT Bold",
-          "Trebuchet MS",
-          sans-serif;
-      }
-      .victory-card p {
-        margin: 0 0 16px;
-        color: var(--muted);
-      }
-      .victory-card .record {
-        display: inline-block;
-        margin-bottom: 14px;
-        padding: 7px 11px;
-        border-radius: 999px;
-        background: var(--lime);
-        font-weight: 800;
-        font-size: 12px;
-      }
-      .modal-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-      .modal-actions button {
-        min-height: 50px;
-        border-radius: 15px;
-        border: 1px solid var(--line);
-        background: white;
-        font-weight: 800;
-      }
-      .modal-actions .primary {
-        min-height: 50px;
-        border: 0;
-        background: var(--sea);
-      }
-      #confetti {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-
-      @media (min-width: 700px) {
-        #startScreen {
-          padding-left: 30px;
-          padding-right: 30px;
-        }
-        .start-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
-          gap: 32px;
-          align-items: start;
-        }
-        .gallery {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        .start-actions {
-          position: static;
-          background: none;
-        }
-        .game-layout {
-          grid-template-columns: 1fr 120px;
-          grid-template-rows: auto 1fr;
-        }
-        .topbar {
-          grid-column: 1 / 3;
-          grid-template-columns: 48px minmax(0, 1fr) auto;
-        }
-        .stats {
-          gap: 16px;
-        }
-        .stat {
-          min-width: 58px;
-        }
-        .toolbar {
-          gap: 6px;
-        }
-        .toolbar .icon-btn {
-          width: 42px;
-        }
-        .board-wrap {
-          grid-column: 1;
-          grid-row: 2;
-        }
-        .tray {
-          grid-column: 2;
-          grid-row: 2;
-          min-height: 0;
-          border-top: 0;
-          border-left: 1px solid var(--line);
-          overflow: hidden;
-        }
-        .tray-head {
-          display: block;
-          text-align: center;
-          line-height: 1.5;
-        }
-        .tray-list {
-          height: calc(100% - 42px);
-          flex-direction: column;
-          align-items: center;
-          overflow-x: hidden;
-          overflow-y: auto;
-        }
-        .piece-chip {
-          flex-basis: 72px;
-          width: 72px;
-          height: 72px;
-        }
-      }
-      @media (orientation: landscape) and (max-height: 520px) {
-        .topbar {
-          padding-top: max(5px, env(safe-area-inset-top));
-          padding-bottom: 5px;
-        }
-        .topbar .icon-btn,
-        .toolbar .icon-btn {
-          width: 38px;
-          height: 38px;
-        }
-        .tray {
-          min-height: 76px;
-          padding-top: 6px;
-        }
-        .piece-chip {
-          flex-basis: 48px;
-          width: 48px;
-          height: 48px;
-        }
-        .tray-head {
-          display: none;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *,
-        *::before,
-        *::after {
-          scroll-behavior: auto !important;
-          transition-duration: 0.01ms !important;
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main id="startScreen" class="screen" aria-labelledby="startTitle">
-      <div class="start-shell">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">◆</div>
-          <div>
-            <strong>Кусочки</strong><span>пазлы для спокойной минуты</span>
-          </div>
-        </div>
-        <div class="start-grid">
-          <section>
-            <h1 id="startTitle">Сложи картинку по кусочкам</h1>
-            <p class="lead">
-              Выбери сюжет или преврати свою фотографию в настоящий пазл.
-            </p>
-            <div class="section-title">
-              <h2>Картинка</h2>
-              <span>5 сюжетов + своё фото</span>
-            </div>
-            <div
-              id="gallery"
-              class="gallery"
-              role="group"
-              aria-label="Выбор картинки"
-            ></div>
-            <input id="fileInput" type="file" accept="image/*" />
-          </section>
-          <section>
-            <div class="section-title">
-              <h2>Сложность</h2>
-              <span>на телефоне начни с 12</span>
-            </div>
-            <div
-              id="difficulty"
-              class="difficulty"
-              role="group"
-              aria-label="Выбор сложности"
-            ></div>
-            <div class="start-actions">
-              <button id="startButton" class="primary" type="button">
-                Начать собирать
-              </button>
-              <button id="resumeButton" class="resume hidden" type="button">
-                Продолжить сохранённую игру
-              </button>
-            </div>
-          </section>
-        </div>
+  <section id="start" class="screen">
+    <div class="card">
+      <div class="stamp">鮨</div>
+      <h1>Sushi <span>Tower Stack</span></h1>
+      <p class="tagline">Лови ритм. Режь точно.<br>Построй самую высокую суши-башню.</p>
+      <div class="stats">
+        <div class="stat"><b id="startBest">0</b><small>Рекорд</small></div>
+        <div class="stat"><b id="startDaily">0</b><small>Сегодня</small></div>
       </div>
-    </main>
-
-    <div
-      id="gameScreen"
-      class="screen hidden"
-      role="main"
-      aria-label="Игровое поле"
-    >
-      <div class="game-layout">
-        <header class="topbar">
-          <button
-            id="backButton"
-            class="icon-btn"
-            type="button"
-            aria-label="Вернуться в меню"
-          >
-            ‹
-          </button>
-          <div class="stats">
-            <div class="stat"><b id="timer">00:00</b><small>время</small></div>
-            <div class="stat"><b id="moves">0</b><small>ходы</small></div>
-            <div class="stat"><b id="progress">0%</b><small>готово</small></div>
-          </div>
-          <div class="toolbar">
-            <button
-              id="hintButton"
-              class="icon-btn"
-              type="button"
-              aria-label="Показать оригинал"
-              title="Показать оригинал"
-            >
-              ◉
-            </button>
-            <button
-              id="soundButton"
-              class="icon-btn"
-              type="button"
-              aria-label="Выключить звук"
-              title="Звук"
-            >
-              ♪
-            </button>
-          </div>
-        </header>
-        <section class="board-wrap">
-          <canvas
-            id="puzzleCanvas"
-            role="img"
-            aria-label="Пазл. Перетаскивайте детали пальцем или мышью"
-          ></canvas>
-          <div id="toast" class="toast" role="status"></div>
-          <div class="zoom-controls" role="group" aria-label="Масштаб">
-            <button id="zoomIn" type="button" aria-label="Приблизить">+</button>
-            <button id="zoomOut" type="button" aria-label="Отдалить">−</button>
-            <button
-              id="fitButton"
-              type="button"
-              aria-label="Показать весь пазл"
-            >
-              ⌂
-            </button>
-          </div>
-          <div id="originalOverlay" class="original-overlay">
-            <img
-              id="originalImage"
-              src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
-              alt="Оригинал картинки"
-            />
-          </div>
-        </section>
-        <aside class="tray">
-          <div class="tray-head">
-            <b>Кусочки</b><span id="trayCount">0 осталось</span>
-          </div>
-          <div
-            id="trayList"
-            class="tray-list"
-            role="group"
-            aria-label="Список деталей"
-          ></div>
-        </aside>
-      </div>
+      <button id="play">Играть</button>
+      <p class="hint">Тап по экрану или пробел</p>
     </div>
+  </section>
 
-    <div
-      id="victoryModal"
-      class="modal hidden"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="victoryTitle"
-    >
-      <div class="victory-card">
-        <canvas id="confetti"></canvas>
-        <img
-          id="victoryImage"
-          src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
-          alt="Собранный пазл"
-        />
-        <h2 id="victoryTitle">Картинка собрана!</h2>
-        <p id="victoryStats"></p>
-        <div id="recordBadge" class="record hidden">Новый личный рекорд</div>
-        <div class="modal-actions">
-          <button id="menuButton" type="button">В галерею</button>
-          <button id="againButton" class="primary" type="button">
-            Ещё раз
-          </button>
-        </div>
+  <section id="gameover" class="screen hidden">
+    <div class="card">
+      <div class="stamp">終</div>
+      <h2>Башня упала</h2>
+      <div class="stats">
+        <div class="stat"><b id="finalScore">0</b><small>Счёт</small></div>
+        <div class="stat"><b id="finalBest">0</b><small>Рекорд</small></div>
       </div>
+      <button id="again">Заново</button>
+      <button id="share" class="secondary">Поделиться результатом</button>
+      <div id="shareStatus"></div>
     </div>
+  </section>
 
-    <script>
-      (() => {
-        "use strict";
+  <script>
+  (() => {
+    'use strict';
 
-        const $ = (selector) => document.querySelector(selector);
-        const STORAGE_KEY = "kusochki-save-v1";
-        const SETTINGS_KEY = "kusochki-settings-v1";
-        const RECORDS_KEY = "kusochki-records-v1";
-        const COLLECTION_KEY = "kusochki-collection-v1";
-        const reducedMotion = matchMedia(
-          "(prefers-reduced-motion: reduce)",
-        ).matches;
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const hud = document.getElementById('hud');
+    const scoreEl = document.getElementById('score');
+    const levelEl = document.getElementById('level');
+    const powerEl = document.getElementById('power');
+    const messageEl = document.getElementById('message');
+    const startScreen = document.getElementById('start');
+    const overScreen = document.getElementById('gameover');
+    const shareStatus = document.getElementById('shareStatus');
 
-        const galleryData = [
-          {
-            id: "fjord",
-            name: "Фьорд",
-            colors: ["#9ed9e5", "#286b83", "#e6c67a"],
-            art: '<path fill="#24596d" d="M0 430 210 160l90 112 105-190 235 348z"/><path fill="#eef7f4" d="m210 160 90 112 27-49 78-141-58 191-47-37-31 38z"/><path fill="#367f8f" d="M0 420h640v220H0z"/><path fill="#65adba" d="m0 485 180-32 170 49 290-72v210H0z"/>',
-          },
-          {
-            id: "fox",
-            name: "Лиса",
-            colors: ["#b9d777", "#dd7136", "#385549"],
-            art: '<path fill="#d96b32" d="M170 470 210 210l92 80 104-90 74 270z"/><path fill="#f3d5ae" d="m242 333 62 38 68-42-18 122-54 38-52-40z"/><path fill="#283f3a" d="m206 221 81 79-59 25zm200-21-22 119 76-84z"/><circle cx="277" cy="377" r="9" fill="#243b38"/><circle cx="342" cy="374" r="9" fill="#243b38"/><path fill="#243b38" d="m294 416 34-2-16 19z"/>',
-          },
-          {
-            id: "orbit",
-            name: "Орбита",
-            colors: ["#26385f", "#7768aa", "#efb85e"],
-            art: '<circle cx="320" cy="310" r="145" fill="#6d65a7"/><circle cx="278" cy="270" r="28" fill="#8d85bd"/><circle cx="370" cy="365" r="42" fill="#514c8c"/><path d="M77 408c164 90 410 64 501-65" fill="none" stroke="#efbd69" stroke-width="28"/><circle cx="520" cy="354" r="20" fill="#f5d180"/><g fill="#fff"><circle cx="91" cy="90" r="5"/><circle cx="520" cy="102" r="7"/><circle cx="150" cy="250" r="4"/><circle cx="580" cy="235" r="4"/></g>',
-          },
-          {
-            id: "city",
-            name: "Город",
-            colors: ["#a9d8d9", "#e6905d", "#425b71"],
-            art: '<path fill="#edaa6d" d="M0 410h640v230H0z"/><path fill="#52677a" d="M52 260h100v250H52zm118 75h86v175h-86zm111-190h116v365H281zm143 105h143v260H424z"/><g fill="#f8d477"><path d="M75 290h22v30H75zm39 0h22v30h-22zM75 345h22v30H75zm39 0h22v30h-22zm196-150h24v35h-24zm42 0h24v35h-24zm-42 60h24v35h-24zm42 0h24v35h-24zm100 35h28v32h-28zm52 0h28v32h-28z"/></g>',
-          },
-          {
-            id: "garden",
-            name: "Сад",
-            colors: ["#b9dfd0", "#dd5884", "#f1bd4b"],
-            art: '<g fill="#3f896c"><path d="M310 640c-40-190 12-315 35-410h22c-15 121-18 274 2 410z"/><path d="M340 425C215 420 143 344 116 249c118 1 203 58 224 176zm25 74c93-67 172-58 225-23-65 90-150 103-225 23z"/></g><g fill="#dd5884"><circle cx="350" cy="220" r="82"/><circle cx="275" cy="265" r="69"/><circle cx="423" cy="274" r="71"/><circle cx="322" cy="338" r="74"/><circle cx="397" cy="350" r="65"/></g><circle cx="354" cy="290" r="68" fill="#f2c34e"/>',
-          },
-        ];
-        const difficulties = [
-          { count: 12, cols: 4, rows: 3, label: "легко" },
-          { count: 24, cols: 6, rows: 4, label: "уютно" },
-          { count: 48, cols: 8, rows: 6, label: "средне" },
-          { count: 96, cols: 12, rows: 8, label: "сложно" },
-          { count: 150, cols: 15, rows: 10, label: "эксперт" },
-        ];
+    const store = {
+      get(key, fallback = 0) {
+        try { return Number(localStorage.getItem(key)) || fallback; } catch (_) { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, String(value)); } catch (_) {}
+      }
+    };
 
-        const state = {
-          selectedImage: galleryData[0].id,
-          customImage: null,
-          difficulty: difficulties[0],
-          image: null,
-          imageSrc: "",
-          pieces: [],
-          clusters: new Map(),
-          cols: 0,
-          rows: 0,
-          boardW: 900,
-          boardH: 600,
-          seed: 1,
-          moves: 0,
-          elapsed: 0,
-          startedAt: 0,
-          timerId: 0,
-          running: false,
-          completed: false,
-          sound: true,
-          camera: { x: 0, y: 0, scale: 1 },
-          pointers: new Map(),
-          drag: null,
-          gesture: null,
-          dirty: true,
-          raf: 0,
-          saveTimer: 0,
-        };
+    const today = new Date().toISOString().slice(0, 10);
+    let best = store.get('sushiTowerBest');
+    let daily = store.get('sushiTowerDate') === today ? store.get('sushiTowerDaily') : 0;
+    if (store.get('sushiTowerDate') !== today) {
+      store.set('sushiTowerDate', today);
+      store.set('sushiTowerDaily', 0);
+    }
 
-        const canvas = $("#puzzleCanvas");
-        const ctx = canvas.getContext("2d", {
-          alpha: false,
-          desynchronized: true,
+    let W = 0, H = 0, dpr = 1;
+    let gameState = 'menu';
+    let layers = [];
+    let mover = null;
+    let debris = [];
+    let particles = [];
+    let score = 0;
+    let level = 1;
+    let combo = 0;
+    let initialWidth = 0;
+    let minWidth = 0;
+    let camera = 0;
+    let cameraTarget = 0;
+    let lastTime = performance.now();
+    let shake = 0;
+    let flash = 0;
+    let guideUntil = 0;
+    let soyShield = false;
+    let slowNext = false;
+    let direction = 1;
+    let audioCtx = null;
+    let powerTimer = 0;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = innerWidth;
+      H = innerHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (gameState === 'menu') draw(performance.now());
+    }
+
+    function roundedRect(x, y, w, h, r) {
+      r = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+    }
+
+    function backgroundTheme() {
+      const phase = Math.floor(Math.max(0, level - 1) / 15) % 4;
+      return [
+        ['#fff4df', '#f3c6b3', '#7aa87d'],
+        ['#ffd5b5', '#d9847d', '#8d4d67'],
+        ['#263752', '#10192d', '#86b6c8'],
+        ['#35204f', '#101327', '#ff5f91']
+      ][phase];
+    }
+
+    function drawBackground(now) {
+      const theme = backgroundTheme();
+      const gradient = ctx.createLinearGradient(0, 0, 0, H);
+      gradient.addColorStop(0, theme[0]);
+      gradient.addColorStop(1, theme[1]);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.globalAlpha = .13;
+      ctx.fillStyle = theme[2];
+      for (let i = 0; i < 9; i++) {
+        const x = ((i * 173 + 42) % (W + 100)) - 50;
+        const y = 55 + (i % 4) * 86;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(i * .7 + Math.sin(now / 2400 + i) * .08);
+        for (let p = 0; p < 5; p++) {
+          ctx.rotate(Math.PI * 2 / 5);
+          ctx.beginPath();
+          ctx.ellipse(0, 8, 5, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+
+      const boardY = H - 82 + camera;
+      ctx.fillStyle = 'rgba(69,37,29,.16)';
+      ctx.fillRect(0, boardY + 13, W, 80);
+      const wood = ctx.createLinearGradient(0, boardY, 0, boardY + 68);
+      wood.addColorStop(0, '#d49a63');
+      wood.addColorStop(1, '#a9673f');
+      ctx.fillStyle = wood;
+      roundedRect(-18, boardY, W + 36, 82, 20);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(88,49,31,.2)';
+      ctx.lineWidth = 2;
+      for (let y = boardY + 14; y < boardY + 75; y += 13) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y + Math.sin(y) * 2); ctx.stroke();
+      }
+    }
+
+    function layerPalette(type, skin) {
+      const classic = [
+        ['#faf1d6', '#e8d7b4', '#f28b72'],
+        ['#273c34', '#15271f', '#f6f0d8'],
+        ['#202f29', '#12211c', '#f09c48'],
+        ['#f2c27e', '#d9915e', '#fff1ce'],
+        ['#faf0d6', '#dfcbaa', '#e95758']
+      ];
+      const spicy = [['#fff0cf','#e3c392','#e65043'],['#762f2b','#421f22','#ffd169'],['#54241f','#321615','#ef673f'],['#ee975f','#bf503c','#fff1ce'],['#ffe8bc','#e0b77e','#ff493b']];
+      const gold = [['#fff4be','#d9a62e','#fff08c'],['#b07a19','#6f4812','#fff4bb'],['#72511c','#3d2d13','#ffc83d'],['#f8ca47','#bd7d16','#fff4bc'],['#ffe9a0','#ca941e','#fff8cc']];
+      return (skin === 2 ? gold : skin === 1 ? spicy : classic)[type % 5];
+    }
+
+    function drawSushi(layer, alpha = 1) {
+      if (layer.w <= 0) return;
+      const x = layer.x;
+      const y = layer.y + camera;
+      const w = layer.w;
+      const h = layer.h;
+      const type = layer.type % 5;
+      const p = layerPalette(type, layer.skin || 0);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = 'rgba(54,31,25,.24)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 5;
+      roundedRect(x, y, w, h, Math.min(9, w / 5));
+      ctx.fillStyle = p[0];
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      const shade = ctx.createLinearGradient(0, y, 0, y + h);
+      shade.addColorStop(0, 'rgba(255,255,255,.24)');
+      shade.addColorStop(1, 'rgba(52,28,22,.16)');
+      ctx.fillStyle = shade;
+      roundedRect(x, y, w, h, Math.min(9, w / 5));
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(56,33,27,.27)';
+      ctx.lineWidth = 1.4;
+      roundedRect(x + .7, y + .7, Math.max(0, w - 1.4), h - 1.4, Math.min(9, w / 5));
+      ctx.stroke();
+
+      if (type === 0) {
+        ctx.fillStyle = p[2];
+        roundedRect(x - 2, y - 5, w + 4, h * .48, Math.min(10, w / 4));
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.26)';
+        roundedRect(x + 5, y - 2, Math.max(0, w * .6), 3, 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(122,43,39,.25)';
+        for (let i = 12; i < w; i += 22) { ctx.beginPath(); ctx.moveTo(x + i, y - 3); ctx.lineTo(x + i - 7, y + 8); ctx.stroke(); }
+      } else if (type === 1) {
+        ctx.fillStyle = p[1];
+        roundedRect(x, y, w, h, Math.min(9, w / 5)); ctx.fill();
+        const count = Math.max(1, Math.floor(w / 35));
+        for (let i = 0; i < count; i++) {
+          const cx = x + (i + .5) * w / count;
+          ctx.fillStyle = p[2]; ctx.beginPath(); ctx.ellipse(cx, y + h / 2, Math.min(13, w / count * .37), h * .35, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = i % 2 ? '#79a95e' : '#e76455'; ctx.beginPath(); ctx.arc(cx, y + h / 2, Math.min(5, w / count * .15), 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (type === 2) {
+        ctx.fillStyle = p[1]; roundedRect(x, y, w, h, 5); ctx.fill();
+        ctx.fillStyle = p[2]; roundedRect(x + 3, y - 4, Math.max(0, w - 6), h * .55, 5); ctx.fill();
+        ctx.fillStyle = '#91af50';
+        for (let i = 7; i < w - 3; i += 13) { ctx.beginPath(); ctx.arc(x + i, y + 3, 2.2, 0, Math.PI * 2); ctx.fill(); }
+      } else if (type === 3) {
+        ctx.fillStyle = p[2]; roundedRect(x, y, w, h, Math.min(8, w / 5)); ctx.fill();
+        ctx.fillStyle = p[0];
+        for (let i = 7; i < w; i += 12) { ctx.beginPath(); ctx.ellipse(x + i, y + h / 2, 2.5, 4, i, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#df7251'; roundedRect(x + w * .37, y + 5, w * .26, h - 10, 4); ctx.fill();
+      } else {
+        ctx.fillStyle = p[0]; roundedRect(x, y, w, h, 8); ctx.fill();
+        ctx.fillStyle = p[2]; roundedRect(x - 1, y - 3, w + 2, h * .42, 8); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.38)'; ctx.lineWidth = 2;
+        for (let i = 8; i < w; i += 18) { ctx.beginPath(); ctx.moveTo(x + i, y - 1); ctx.lineTo(x + i + 7, y + 7); ctx.stroke(); }
+      }
+
+      if ((layer.skin || 0) === 2) {
+        const gleam = ((performance.now() / 18) % (w + 50)) - 25;
+        ctx.globalAlpha *= .5;
+        ctx.strokeStyle = '#fffbe1'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(x + gleam - 9, y + h); ctx.lineTo(x + gleam + 9, y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function currentSkin() {
+      return best >= 2500 ? 2 : best >= 700 ? 1 : 0;
+    }
+
+    function resetGame() {
+      score = 0; level = 1; combo = 0; debris = []; particles = [];
+      camera = 0; cameraTarget = 0; shake = 0; flash = 0;
+      guideUntil = 0; soyShield = false; slowNext = false; direction = 1;
+      initialWidth = Math.min(W * .68, 285);
+      minWidth = initialWidth * .08;
+      const h = Math.max(28, Math.min(34, H * .045));
+      layers = [{ x: (W - initialWidth) / 2, y: H - 116, w: initialWidth, h, type: 3, skin: currentSkin() }];
+      gameState = 'playing';
+      startScreen.classList.add('hidden');
+      overScreen.classList.add('hidden');
+      hud.hidden = false;
+      updateHud();
+      spawnMover();
+    }
+
+    function speedForLevel(n) {
+      const growth = 1 + .055 * Math.min(n, 20) + .018 * Math.log2(Math.max(1, n - 18)) * Math.max(0, n - 18);
+      return Math.min(W * 1.3, Math.max(170, W * .48) * growth);
+    }
+
+    function spawnMover() {
+      const top = layers[layers.length - 1];
+      direction *= -1;
+      const w = Math.max(minWidth, top.w);
+      const spawnLeft = direction > 0;
+      const reduction = slowNext ? .7 : 1;
+      mover = {
+        x: spawnLeft ? -w - 6 : W + 6,
+        y: top.y - top.h - Math.min(66, H * .08),
+        targetY: top.y - top.h,
+        w, h: top.h,
+        vx: speedForLevel(level) * direction * reduction,
+        type: level % 5,
+        skin: currentSkin(),
+        dropping: false,
+        vy: 0,
+        bounces: 0,
+        nextJuke: performance.now() + 550
+      };
+      slowNext = false;
+      cameraTarget = Math.max(0, H * .4 - mover.targetY);
+    }
+
+    function updateHud() {
+      scoreEl.textContent = score;
+      levelEl.textContent = `Этаж ${level}`;
+    }
+
+    function showMessage(text) {
+      messageEl.textContent = text;
+      messageEl.classList.remove('pop');
+      void messageEl.offsetWidth;
+      messageEl.classList.add('pop');
+    }
+
+    function showPower(text, duration = 2500) {
+      clearTimeout(powerTimer);
+      powerEl.textContent = text;
+      powerEl.classList.add('show');
+      powerTimer = setTimeout(() => powerEl.classList.remove('show'), duration);
+    }
+
+    function grantPowerup() {
+      const pick = (Math.floor(level / 8) - 1) % 3;
+      if (pick === 0) {
+        slowNext = true;
+        showPower('● Васаби: замедление');
+        showMessage('Васаби-буст!');
+      } else if (pick === 1) {
+        guideUntil = performance.now() + 3000;
+        showPower('╎ Палочки: точный центр', 3000);
+        showMessage('Палочки точности!');
+      } else {
+        soyShield = true;
+        showPower('◆ Соус: защита от среза', 5000);
+        showMessage('Соевый щит!');
+      }
+      sound('power');
+    }
+
+    function input() {
+      if (gameState !== 'playing' || !mover || mover.dropping) return;
+      unlockAudio();
+      mover.dropping = true;
+      mover.vy = 150;
+      if (navigator.vibrate) navigator.vibrate(12);
+    }
+
+    function landMover() {
+      const prev = layers[layers.length - 1];
+      const left = Math.max(mover.x, prev.x);
+      const right = Math.min(mover.x + mover.w, prev.x + prev.w);
+      let overlap = right - left;
+      const ratio = overlap / mover.w;
+      const centerDiff = Math.abs((mover.x + mover.w / 2) - (prev.x + prev.w / 2));
+      const perfect = centerDiff <= Math.max(3, prev.w * .025);
+
+      if (ratio < .12) {
+        addDebris({ ...mover }, mover.x < prev.x ? -1 : 1, true);
+        mover = null;
+        shake = 15;
+        sound('fail');
+        if (navigator.vibrate) navigator.vibrate([45, 35, 90]);
+        setTimeout(endGame, 650);
+        gameState = 'ending';
+        return;
+      }
+
+      if (perfect) {
+        combo++;
+        const oldX = mover.x;
+        mover.x = prev.x;
+        mover.w = prev.w;
+        score += 20 * (combo + 1);
+        flash = 1;
+        sparkle(prev.x, mover.targetY, prev.w);
+        showMessage(combo > 1 ? `Perfect · Комбо x${combo}!` : 'Perfect!');
+        if (Math.abs(oldX - prev.x) > 2) addTinyTrim(oldX, prev.x, mover.targetY, prev.h);
+        sound('perfect');
+        if (navigator.vibrate) navigator.vibrate([10, 20, 18]);
+      } else if (soyShield) {
+        soyShield = false;
+        combo = 0;
+        mover.x = prev.x;
+        mover.w = prev.w;
+        score += 10;
+        showMessage('Соус спас слой!');
+        showPower('Защита использована');
+        sound('power');
+      } else {
+        combo = 0;
+        score += 10;
+        if (mover.x < prev.x) {
+          addDebris({ ...mover, w: prev.x - mover.x }, -1);
+        } else if (mover.x + mover.w > prev.x + prev.w) {
+          addDebris({ ...mover, x: prev.x + prev.w, w: mover.x + mover.w - (prev.x + prev.w) }, 1);
+        }
+        mover.x = left;
+        mover.w = Math.max(minWidth, overlap);
+        if (ratio < .25) { shake = 9; showMessage('На грани!'); }
+        sound('cut');
+      }
+
+      mover.y = mover.targetY;
+      layers.push({ x: mover.x, y: mover.y, w: mover.w, h: mover.h, type: mover.type, skin: mover.skin });
+      mover = null;
+      level++;
+      updateHud();
+      if (level % 8 === 0) grantPowerup();
+      spawnMover();
+    }
+
+    function addTinyTrim(oldX, newX, y, h) {
+      const delta = oldX - newX;
+      if (Math.abs(delta) < 1) return;
+      addDebris({ x: delta < 0 ? oldX : newX + layers[layers.length - 1].w, y, w: Math.abs(delta), h, type: level % 5, skin: currentSkin() }, Math.sign(delta));
+    }
+
+    function addDebris(piece, side, missed = false) {
+      debris.push({
+        ...piece,
+        vx: side * (missed ? 95 : 55) + (Math.random() - .5) * 25,
+        vy: missed ? 30 : -35,
+        rotation: 0,
+        vr: side * (.9 + Math.random() * 1.6),
+        life: 0
+      });
+    }
+
+    function sparkle(x, y, w) {
+      for (let i = 0; i < 18; i++) {
+        particles.push({
+          x: x + Math.random() * w, y: y + Math.random() * 20,
+          vx: (Math.random() - .5) * 100, vy: -30 - Math.random() * 100,
+          life: .7 + Math.random() * .5, max: 1.2, size: 2 + Math.random() * 3
         });
+      }
+    }
 
-        function svgSource(item) {
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><defs><linearGradient id="b" x2="0" y2="1"><stop stop-color="${item.colors[0]}"/><stop offset="1" stop-color="${item.colors[2]}"/></linearGradient></defs><rect width="640" height="640" fill="url(#b)"/>${item.art}</svg>`;
-          return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-        }
+    function update(dt, now) {
+      camera += (cameraTarget - camera) * Math.min(1, dt * 4.5);
+      shake *= Math.pow(.04, dt);
+      flash *= Math.pow(.08, dt);
 
-        function renderStart() {
-          const gallery = $("#gallery");
-          gallery.innerHTML = "";
-          galleryData.forEach((item) => {
-            const button = document.createElement("button");
-            button.className = "picture-card";
-            button.type = "button";
-            button.dataset.id = item.id;
-            button.setAttribute(
-              "aria-pressed",
-              String(state.selectedImage === item.id && !state.customImage),
-            );
-            button.innerHTML = `<img src="${svgSource(item)}" alt="${item.name}"><span>${item.name}</span>`;
-            button.addEventListener("click", () => selectImage(item.id));
-            gallery.append(button);
-          });
-          const upload = document.createElement("button");
-          upload.type = "button";
-          upload.className = "picture-card upload-card";
-          upload.setAttribute(
-            "aria-pressed",
-            String(Boolean(state.customImage)),
-          );
-          upload.innerHTML = state.customImage
-            ? `<img src="${state.customImage}" alt="Загруженная фотография"><span>Моё фото</span>`
-            : '<div class="upload-inner"><b>＋</b><small>Загрузить фото</small></div>';
-          upload.addEventListener("click", () => $("#fileInput").click());
-          gallery.append(upload);
-
-          const diff = $("#difficulty");
-          diff.innerHTML = "";
-          difficulties.forEach((item) => {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.setAttribute(
-              "aria-pressed",
-              String(state.difficulty.count === item.count),
-            );
-            button.innerHTML = `<b>${item.count}</b><small>${item.label}</small>`;
-            button.addEventListener("click", () => {
-              state.difficulty = item;
-              renderStart();
-            });
-            diff.append(button);
-          });
-          $("#resumeButton").classList.toggle(
-            "hidden",
-            !localStorage.getItem(STORAGE_KEY),
-          );
-        }
-
-        function selectImage(id) {
-          state.selectedImage = id;
-          state.customImage = null;
-          renderStart();
-        }
-
-        $("#fileInput").addEventListener("change", async (event) => {
-          const file = event.target.files[0];
-          if (!file) return;
-          if (!file.type.startsWith("image/"))
-            return showToast("Нужен файл изображения");
-          try {
-            state.customImage = await resizeUpload(file, 1400);
-            state.selectedImage =
-              "custom-" + hashString(file.name + file.size + file.lastModified);
-            renderStart();
-          } catch (_) {
-            showToast("Не удалось открыть фотографию");
+      if (gameState === 'playing' && mover) {
+        if (!mover.dropping) {
+          let velocity = mover.vx;
+          if (level > 10) {
+            const edge = Math.min(Math.max(mover.x, 0), Math.max(0, W - mover.x - mover.w));
+            velocity *= 1 + Math.max(0, 1 - edge / (W * .18)) * .15;
           }
-          event.target.value = "";
-        });
-
-        function resizeUpload(file, maxSide) {
-          return new Promise((resolve, reject) => {
-            const image = new Image();
-            const url = URL.createObjectURL(file);
-            image.onload = () => {
-              const ratio = Math.min(
-                1,
-                maxSide / Math.max(image.naturalWidth, image.naturalHeight),
-              );
-              const out = document.createElement("canvas");
-              out.width = Math.round(image.naturalWidth * ratio);
-              out.height = Math.round(image.naturalHeight * ratio);
-              out
-                .getContext("2d")
-                .drawImage(image, 0, 0, out.width, out.height);
-              URL.revokeObjectURL(url);
-              resolve(out.toDataURL("image/jpeg", 0.86));
-            };
-            image.onerror = () => {
-              URL.revokeObjectURL(url);
-              reject(new Error("image"));
-            };
-            image.src = url;
-          });
-        }
-
-        function hashString(value) {
-          let hash = 2166136261;
-          for (let i = 0; i < value.length; i++)
-            hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
-          return hash >>> 0;
-        }
-
-        function mulberry32(seed) {
-          return () => {
-            seed |= 0;
-            seed = (seed + 0x6d2b79f5) | 0;
-            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-          };
-        }
-
-        function loadImage(src) {
-          return new Promise((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = reject;
-            image.src = src;
-          });
-        }
-
-        async function startNewGame() {
-          const item =
-            galleryData.find((x) => x.id === state.selectedImage) ||
-            galleryData[0];
-          const src = state.customImage || svgSource(item);
-          const seed = hashString(
-            state.selectedImage + ":" + state.difficulty.count,
-          );
-          await setupGame({
-            src,
-            imageId: state.selectedImage,
-            seed,
-            cols: state.difficulty.cols,
-            rows: state.difficulty.rows,
-          });
-        }
-
-        async function setupGame(config, saved = null) {
-          state.imageSrc = config.src;
-          state.image = await loadImage(config.src);
-          state.seed = config.seed;
-          state.cols = config.cols;
-          state.rows = config.rows;
-          const ratio = state.image.naturalWidth / state.image.naturalHeight;
-          state.boardW = ratio >= 1 ? 900 : 900 * ratio;
-          state.boardH = ratio >= 1 ? 900 / ratio : 900;
-          state.moves = saved?.moves || 0;
-          state.elapsed = saved?.elapsed || 0;
-          state.completed = false;
-          state.imageId = config.imageId;
-          createPieces(saved?.pieces);
-          $("#startScreen").classList.add("hidden");
-          $("#gameScreen").classList.remove("hidden");
-          $("#originalImage").src = state.imageSrc;
-          state.running = true;
-          state.startedAt = performance.now();
-          clearInterval(state.timerId);
-          state.timerId = setInterval(updateTimer, 500);
-          resizeCanvas();
-          fitView(saved?.camera || null);
-          buildTray();
-          updateHud();
-          scheduleDraw();
-          scheduleSave();
-        }
-
-        function createPieces(savedPieces) {
-          state.pieces = [];
-          state.clusters = new Map();
-          const random = mulberry32(state.seed);
-          const cw = state.boardW / state.cols;
-          const ch = state.boardH / state.rows;
-          const horizontal = Array.from({ length: state.rows - 1 }, () =>
-            Array.from({ length: state.cols }, () => (random() > 0.5 ? 1 : -1)),
-          );
-          const vertical = Array.from({ length: state.rows }, () =>
-            Array.from({ length: state.cols - 1 }, () =>
-              random() > 0.5 ? 1 : -1,
-            ),
-          );
-          for (let row = 0; row < state.rows; row++) {
-            for (let col = 0; col < state.cols; col++) {
-              const id = row * state.cols + col;
-              const edges = {
-                top: row === 0 ? 0 : -horizontal[row - 1][col],
-                right: col === state.cols - 1 ? 0 : vertical[row][col],
-                bottom: row === state.rows - 1 ? 0 : horizontal[row][col],
-                left: col === 0 ? 0 : -vertical[row][col - 1],
-              };
-              const saved = savedPieces?.[id];
-              const piece = {
-                id,
-                row,
-                col,
-                edges,
-                targetX: col * cw,
-                targetY: row * ch,
-                x: saved?.x ?? 0,
-                y: saved?.y ?? 0,
-                cluster: saved?.cluster ?? id,
-                path: makePiecePath(cw, ch, edges),
-                bitmap: null,
-              };
-              state.pieces.push(piece);
-            }
+          mover.x += velocity * dt;
+          if (mover.x <= -mover.w * .12 && mover.vx < 0) { mover.x = -mover.w * .12; mover.vx *= -1; mover.bounces++; }
+          if (mover.x + mover.w >= W + mover.w * .12 && mover.vx > 0) { mover.x = W - mover.w * .88; mover.vx *= -1; mover.bounces++; }
+          if (level >= 5 && now > mover.nextJuke && mover.bounces > 0 && level % 5 === 0) {
+            mover.vx *= -1;
+            mover.nextJuke = now + 650 + Math.random() * 650;
           }
-          if (!savedPieces) scatterPieces(random, cw, ch);
-          for (const piece of state.pieces) {
-            if (!state.clusters.has(piece.cluster))
-              state.clusters.set(piece.cluster, new Set());
-            state.clusters.get(piece.cluster).add(piece.id);
-          }
-          cachePieceImages(cw, ch);
+          if (level > 10) mover.x += Math.sin(now * .028 + level) * Math.min(1.2, level * .035);
+        } else {
+          mover.vy += 1300 * dt;
+          mover.y += mover.vy * dt;
+          if (mover.y >= mover.targetY) landMover();
         }
+      }
 
-        function scatterPieces(random, cw, ch) {
-          const margin = Math.max(cw, ch) * 0.85;
-          const outerW = state.boardW + margin * 2;
-          const outerH = state.boardH + margin * 2;
-          const shuffled = [...state.pieces].sort(() => random() - 0.5);
-          shuffled.forEach((piece, index) => {
-            const side = index % 4;
-            if (side === 0) {
-              piece.x = -margin + random() * margin * 0.55;
-              piece.y = random() * state.boardH;
-            }
-            if (side === 1) {
-              piece.x = state.boardW + margin * 0.25 + random() * margin * 0.45;
-              piece.y = random() * state.boardH;
-            }
-            if (side === 2) {
-              piece.x = random() * outerW - margin;
-              piece.y = -margin + random() * margin * 0.55;
-            }
-            if (side === 3) {
-              piece.x = random() * outerW - margin;
-              piece.y = state.boardH + margin * 0.25 + random() * margin * 0.45;
-            }
-          });
-        }
+      debris.forEach(p => {
+        p.life += dt; p.vy += 950 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rotation += p.vr * dt;
+      });
+      debris = debris.filter(p => p.y + camera < H + 180 && p.life < 4);
+      particles.forEach(p => { p.life -= dt; p.vy += 100 * dt; p.x += p.vx * dt; p.y += p.vy * dt; });
+      particles = particles.filter(p => p.life > 0);
+    }
 
-        function makePiecePath(w, h, edges) {
-          const p = new Path2D();
-          p.moveTo(0, 0);
-          edgeCurve(p, 0, 0, w, 0, 0, -1, edges.top, Math.min(w, h));
-          edgeCurve(p, w, 0, w, h, 1, 0, edges.right, Math.min(w, h));
-          edgeCurve(p, w, h, 0, h, 0, 1, edges.bottom, Math.min(w, h));
-          edgeCurve(p, 0, h, 0, 0, -1, 0, edges.left, Math.min(w, h));
-          p.closePath();
-          return p;
-        }
+    function draw(now) {
+      ctx.save();
+      const sx = shake ? (Math.random() - .5) * shake : 0;
+      const sy = shake ? (Math.random() - .5) * shake : 0;
+      ctx.translate(sx, sy);
+      drawBackground(now);
 
-        function edgeCurve(path, x1, y1, x2, y2, nx, ny, type, unit) {
-          if (!type) {
-            path.lineTo(x2, y2);
-            return;
-          }
-          const dx = x2 - x1,
-            dy = y2 - y1;
-          const point = (t, bump = 0) => [
-            x1 + dx * t + nx * bump,
-            y1 + dy * t + ny * bump,
-          ];
-          let a = point(0.3),
-            b = point(0.36),
-            c = point(0.4, type * unit * 0.12),
-            d = point(0.42, type * unit * 0.3);
-          let e = point(0.5, type * unit * 0.38),
-            f = point(0.58, type * unit * 0.3),
-            g = point(0.6, type * unit * 0.12),
-            h = point(0.64),
-            i = point(0.7);
-          path.lineTo(a[0], a[1]);
-          path.bezierCurveTo(b[0], b[1], c[0], c[1], d[0], d[1]);
-          path.bezierCurveTo(d[0], d[1], e[0], e[1], e[0], e[1]);
-          path.bezierCurveTo(e[0], e[1], f[0], f[1], g[0], g[1]);
-          path.bezierCurveTo(h[0], h[1], h[0], h[1], i[0], i[1]);
-          path.lineTo(x2, y2);
-        }
+      layers.forEach(drawSushi);
+      if (mover) drawSushi(mover);
 
-        function cachePieceImages(cw, ch) {
-          const pad = Math.ceil(Math.min(cw, ch) * 0.42);
-          const scale = Math.min(1.5, 230 / Math.max(cw, ch));
-          for (const piece of state.pieces) {
-            const off = document.createElement("canvas");
-            off.width = Math.ceil((cw + pad * 2) * scale);
-            off.height = Math.ceil((ch + pad * 2) * scale);
-            const c = off.getContext("2d");
-            c.scale(scale, scale);
-            c.translate(pad, pad);
-            c.save();
-            c.clip(piece.path);
-            c.drawImage(
-              state.image,
-              -piece.targetX,
-              -piece.targetY,
-              state.boardW,
-              state.boardH,
-            );
-            c.restore();
-            c.strokeStyle = "rgba(16,48,57,.42)";
-            c.lineWidth = Math.max(1, 2 / scale);
-            c.stroke(piece.path);
-            piece.bitmap = off;
-            piece.pad = pad;
-            piece.cacheScale = scale;
-          }
-        }
+      if (mover && now < guideUntil) {
+        const prev = layers[layers.length - 1];
+        const center = prev.x + prev.w / 2;
+        ctx.save();
+        ctx.setLineDash([6, 7]);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(91,128,72,.7)';
+        ctx.beginPath(); ctx.moveTo(center, mover.targetY + camera - 45); ctx.lineTo(center, prev.y + camera + prev.h); ctx.stroke();
+        ctx.restore();
+      }
 
-        function resizeCanvas() {
-          const rect = canvas.getBoundingClientRect();
-          const dpr = Math.min(devicePixelRatio || 1, 2);
-          canvas.width = Math.max(1, Math.round(rect.width * dpr));
-          canvas.height = Math.max(1, Math.round(rect.height * dpr));
-          state.dpr = dpr;
-          state.viewW = rect.width;
-          state.viewH = rect.height;
-          scheduleDraw();
-        }
+      debris.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x + p.w / 2, p.y + p.h / 2 + camera);
+        ctx.rotate(p.rotation);
+        drawSushi({ ...p, x: -p.w / 2, y: -p.h / 2 - camera });
+        ctx.restore();
+      });
 
-        function fitView(savedCamera = null) {
-          if (savedCamera) {
-            state.camera = savedCamera;
-          } else {
-            const padding = 30;
-            const scale =
-              Math.min(
-                (state.viewW - padding * 2) / state.boardW,
-                (state.viewH - padding * 2) / state.boardH,
-              ) * 0.72;
-            state.camera.scale = Math.max(0.16, scale);
-            state.camera.x =
-              (state.viewW - state.boardW * state.camera.scale) / 2;
-            state.camera.y =
-              (state.viewH - state.boardH * state.camera.scale) / 2;
-          }
-          scheduleDraw();
-        }
+      particles.forEach(p => {
+        ctx.globalAlpha = Math.min(1, p.life * 2);
+        ctx.fillStyle = '#fff7a8';
+        ctx.save(); ctx.translate(p.x, p.y + camera); ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
+      });
+      ctx.globalAlpha = 1;
 
-        function scheduleDraw() {
-          state.dirty = true;
-          if (!state.raf) state.raf = requestAnimationFrame(draw);
-        }
+      if (flash > .01) {
+        ctx.fillStyle = `rgba(255,247,151,${flash * .2})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+      ctx.restore();
+    }
 
-        function draw() {
-          state.raf = 0;
-          if (!state.dirty || !state.running) return;
-          state.dirty = false;
-          const dpr = state.dpr || 1;
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.fillStyle = "#dfe9e8";
-          ctx.fillRect(0, 0, state.viewW, state.viewH);
-          ctx.save();
-          ctx.translate(state.camera.x, state.camera.y);
-          ctx.scale(state.camera.scale, state.camera.scale);
-          drawBoardGuide();
-          const draggedCluster = state.drag?.cluster;
-          for (const piece of state.pieces)
-            if (piece.cluster !== draggedCluster) drawPiece(piece, false);
-          if (draggedCluster != null) {
-            const ids = state.clusters.get(draggedCluster) || [];
-            for (const id of ids) drawPiece(state.pieces[id], true);
-          }
-          ctx.restore();
-        }
+    function loop(now) {
+      const dt = Math.min(.033, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt, now);
+      draw(now);
+      requestAnimationFrame(loop);
+    }
 
-        function drawBoardGuide() {
-          ctx.save();
-          ctx.fillStyle = "#f7faf7";
-          ctx.shadowColor = "rgba(25,65,74,.18)";
-          ctx.shadowBlur = 26 / state.camera.scale;
-          ctx.shadowOffsetY = 8 / state.camera.scale;
-          ctx.fillRect(0, 0, state.boardW, state.boardH);
-          ctx.shadowColor = "transparent";
-          ctx.globalAlpha = 0.14;
-          ctx.drawImage(state.image, 0, 0, state.boardW, state.boardH);
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = "rgba(23,107,135,.45)";
-          ctx.lineWidth = 2 / state.camera.scale;
-          ctx.strokeRect(0, 0, state.boardW, state.boardH);
-          ctx.restore();
-        }
+    function endGame() {
+      gameState = 'over';
+      best = Math.max(best, score);
+      daily = Math.max(daily, score);
+      store.set('sushiTowerBest', best);
+      store.set('sushiTowerDaily', daily);
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('finalBest').textContent = best;
+      document.getElementById('startBest').textContent = best;
+      document.getElementById('startDaily').textContent = daily;
+      shareStatus.textContent = '';
+      hud.hidden = true;
+      overScreen.classList.remove('hidden');
+    }
 
-        function drawPiece(piece, lifted) {
-          const scale = piece.cacheScale;
-          const pad = piece.pad;
-          ctx.save();
-          const liftScale = lifted && !reducedMotion ? 1.035 : 1;
-          const cw = state.boardW / state.cols,
-            ch = state.boardH / state.rows;
-          ctx.translate(piece.x + cw / 2, piece.y + ch / 2);
-          ctx.scale(liftScale, liftScale);
-          if (lifted) {
-            ctx.shadowColor = "rgba(11,44,54,.36)";
-            ctx.shadowBlur = 18 / state.camera.scale;
-            ctx.shadowOffsetY = 7 / state.camera.scale;
-          }
-          ctx.drawImage(
-            piece.bitmap,
-            -(cw / 2 + pad),
-            -(ch / 2 + pad),
-            piece.bitmap.width / scale,
-            piece.bitmap.height / scale,
-          );
-          ctx.restore();
-        }
+    function unlockAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
 
-        function screenToWorld(clientX, clientY) {
-          const rect = canvas.getBoundingClientRect();
-          return {
-            x: (clientX - rect.left - state.camera.x) / state.camera.scale,
-            y: (clientY - rect.top - state.camera.y) / state.camera.scale,
-          };
-        }
+    function sound(kind) {
+      try {
+        unlockAudio();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const data = {
+          cut: [180, 105, .11, 'sine'], perfect: [520, 880, .18, 'sine'],
+          fail: [145, 55, .35, 'triangle'], power: [340, 650, .22, 'sine']
+        }[kind] || [300, 180, .1, 'sine'];
+        osc.type = data[3]; osc.frequency.setValueAtTime(data[0], t); osc.frequency.exponentialRampToValueAtTime(data[1], t + data[2]);
+        gain.gain.setValueAtTime(.08, t); gain.gain.exponentialRampToValueAtTime(.001, t + data[2]);
+        osc.start(t); osc.stop(t + data[2]);
+      } catch (_) {}
+    }
 
-        function hitPiece(world) {
-          const hit = document.createElement("canvas").getContext("2d");
-          const ordered = state.drag
-            ? [
-                ...state.pieces.filter((p) => p.cluster !== state.drag.cluster),
-                ...[...state.clusters.get(state.drag.cluster)].map(
-                  (id) => state.pieces[id],
-                ),
-              ]
-            : state.pieces;
-          for (let i = ordered.length - 1; i >= 0; i--) {
-            const piece = ordered[i];
-            if (
-              hit.isPointInPath(
-                piece.path,
-                world.x - piece.x,
-                world.y - piece.y,
-              )
-            )
-              return piece;
-          }
-          return null;
-        }
+    async function shareResult() {
+      const text = `Я построил суши-башню на ${level - 1} этажей и набрал ${score} очков в Sushi Tower Stack!`;
+      try {
+        if (navigator.share) await navigator.share({ title: 'Sushi Tower Stack', text });
+        else if (navigator.clipboard) { await navigator.clipboard.writeText(text); shareStatus.textContent = 'Результат скопирован'; }
+        else { shareStatus.textContent = text; }
+      } catch (err) {
+        if (err.name !== 'AbortError') shareStatus.textContent = 'Не удалось поделиться';
+      }
+    }
 
-        canvas.addEventListener("pointerdown", (event) => {
-          if (!state.running) return;
-          canvas.setPointerCapture(event.pointerId);
-          state.pointers.set(event.pointerId, {
-            x: event.clientX,
-            y: event.clientY,
-          });
-          if (state.pointers.size === 2) {
-            state.drag = null;
-            const pts = [...state.pointers.values()];
-            state.gesture = gestureSnapshot(pts);
-            canvas.classList.add("dragging");
-            scheduleDraw();
-            return;
-          }
-          const world = screenToWorld(event.clientX, event.clientY);
-          const piece = hitPiece(world);
-          if (piece) {
-            state.drag = {
-              pointerId: event.pointerId,
-              cluster: piece.cluster,
-              last: world,
-              moved: false,
-            };
-          } else {
-            state.drag = {
-              pointerId: event.pointerId,
-              cluster: null,
-              lastScreen: { x: event.clientX, y: event.clientY },
-              moved: false,
-            };
-          }
-          canvas.classList.add("dragging");
-          scheduleDraw();
-        });
+    function stopButtonEvent(event) { event.stopPropagation(); }
+    ['play', 'again', 'share'].forEach(id => {
+      document.getElementById(id).addEventListener('touchstart', stopButtonEvent, { passive: true });
+    });
+    document.getElementById('play').addEventListener('click', () => { unlockAudio(); resetGame(); });
+    document.getElementById('again').addEventListener('click', () => { unlockAudio(); resetGame(); });
+    document.getElementById('share').addEventListener('click', shareResult);
 
-        canvas.addEventListener("pointermove", (event) => {
-          if (!state.pointers.has(event.pointerId)) return;
-          state.pointers.set(event.pointerId, {
-            x: event.clientX,
-            y: event.clientY,
-          });
-          if (state.pointers.size >= 2) {
-            const pts = [...state.pointers.values()].slice(0, 2);
-            if (!state.gesture) state.gesture = gestureSnapshot(pts);
-            const now = gestureSnapshot(pts);
-            const scale = clamp(
-              (state.gesture.cameraScale * now.distance) /
-                state.gesture.distance,
-              0.15,
-              3.5,
-            );
-            state.camera.scale = scale;
-            state.camera.x = now.midX - state.gesture.worldX * scale;
-            state.camera.y = now.midY - state.gesture.worldY * scale;
-            scheduleDraw();
-            return;
-          }
-          if (!state.drag || state.drag.pointerId !== event.pointerId) return;
-          if (state.drag.cluster == null) {
-            const dx = event.clientX - state.drag.lastScreen.x;
-            const dy = event.clientY - state.drag.lastScreen.y;
-            state.camera.x += dx;
-            state.camera.y += dy;
-            state.drag.lastScreen = { x: event.clientX, y: event.clientY };
-            state.drag.moved ||= Math.abs(dx) + Math.abs(dy) > 2;
-          } else {
-            const world = screenToWorld(event.clientX, event.clientY);
-            const dx = world.x - state.drag.last.x,
-              dy = world.y - state.drag.last.y;
-            translateCluster(state.drag.cluster, dx, dy);
-            state.drag.last = world;
-            state.drag.moved ||= Math.abs(dx) + Math.abs(dy) > 1;
-          }
-          scheduleDraw();
-        });
+    window.addEventListener('touchstart', event => {
+      if (gameState === 'playing') { event.preventDefault(); input(); }
+    }, { passive: false });
+    window.addEventListener('mousedown', event => {
+      if (event.button === 0 && event.target === canvas) input();
+    });
+    window.addEventListener('keydown', event => {
+      if (event.code === 'Space') { event.preventDefault(); input(); }
+    });
+    window.addEventListener('resize', resize, { passive: true });
+    document.addEventListener('visibilitychange', () => { lastTime = performance.now(); });
 
-        function endPointer(event) {
-          if (!state.pointers.has(event.pointerId)) return;
-          const wasGesture = state.pointers.size > 1 || state.gesture;
-          state.pointers.delete(event.pointerId);
-          if (wasGesture) {
-            if (state.pointers.size < 2) state.gesture = null;
-            state.drag = null;
-          } else if (state.drag?.pointerId === event.pointerId) {
-            if (state.drag.cluster != null && state.drag.moved) {
-              state.moves++;
-              snapCluster(state.drag.cluster);
-              updateHud();
-              scheduleSave();
-            }
-            state.drag = null;
-          }
-          if (!state.pointers.size) canvas.classList.remove("dragging");
-          scheduleDraw();
-        }
-        canvas.addEventListener("pointerup", endPointer);
-        canvas.addEventListener("pointercancel", endPointer);
-        canvas.addEventListener("contextmenu", (event) =>
-          event.preventDefault(),
-        );
-        canvas.addEventListener(
-          "wheel",
-          (event) => {
-            event.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            zoomAt(
-              event.clientX - rect.left,
-              event.clientY - rect.top,
-              Math.exp(-event.deltaY * 0.0012),
-            );
-          },
-          { passive: false },
-        );
-
-        function gestureSnapshot(points) {
-          const rect = canvas.getBoundingClientRect();
-          const midX = (points[0].x + points[1].x) / 2 - rect.left;
-          const midY = (points[0].y + points[1].y) / 2 - rect.top;
-          return {
-            midX,
-            midY,
-            distance: Math.max(
-              10,
-              Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y),
-            ),
-            cameraScale: state.camera.scale,
-            worldX: (midX - state.camera.x) / state.camera.scale,
-            worldY: (midY - state.camera.y) / state.camera.scale,
-          };
-        }
-
-        function translateCluster(clusterId, dx, dy) {
-          const ids = state.clusters.get(clusterId);
-          if (!ids) return;
-          for (const id of ids) {
-            state.pieces[id].x += dx;
-            state.pieces[id].y += dy;
-          }
-        }
-
-        function snapCluster(clusterId) {
-          let current = clusterId;
-          const threshold = Math.max(18, 30 / state.camera.scale);
-          let joined = false;
-          for (;;) {
-            const match = findNeighborMatch(current, threshold);
-            if (!match) break;
-            translateCluster(current, match.dx, match.dy);
-            current = mergeClusters(current, match.otherCluster);
-            joined = true;
-          }
-          const ids = state.clusters.get(current);
-          const first = state.pieces[ids.values().next().value];
-          const absoluteDx = first.targetX - first.x;
-          const absoluteDy = first.targetY - first.y;
-          if (Math.hypot(absoluteDx, absoluteDy) <= threshold) {
-            translateCluster(current, absoluteDx, absoluteDy);
-            joined = true;
-          }
-          if (joined) feedback();
-          updateHud();
-          buildTray();
-          checkVictory();
-        }
-
-        function findNeighborMatch(clusterId, threshold) {
-          const ids = state.clusters.get(clusterId);
-          let best = null;
-          for (const id of ids) {
-            const p = state.pieces[id];
-            const neighbors = [];
-            if (p.col > 0) neighbors.push(id - 1);
-            if (p.col < state.cols - 1) neighbors.push(id + 1);
-            if (p.row > 0) neighbors.push(id - state.cols);
-            if (p.row < state.rows - 1) neighbors.push(id + state.cols);
-            for (const nid of neighbors) {
-              const n = state.pieces[nid];
-              if (n.cluster === clusterId) continue;
-              const dx = n.x + (p.targetX - n.targetX) - p.x;
-              const dy = n.y + (p.targetY - n.targetY) - p.y;
-              const distance = Math.hypot(dx, dy);
-              if (distance <= threshold && (!best || distance < best.distance))
-                best = { dx, dy, distance, otherCluster: n.cluster };
-            }
-          }
-          return best;
-        }
-
-        function mergeClusters(a, b) {
-          if (a === b) return a;
-          const keep =
-            state.clusters.get(a).size >= state.clusters.get(b).size ? a : b;
-          const drop = keep === a ? b : a;
-          for (const id of state.clusters.get(drop)) {
-            state.clusters.get(keep).add(id);
-            state.pieces[id].cluster = keep;
-          }
-          state.clusters.delete(drop);
-          return keep;
-        }
-
-        function checkVictory() {
-          if (state.clusters.size !== 1) return;
-          const first = state.pieces[0];
-          if (Math.hypot(first.x - first.targetX, first.y - first.targetY) > 1)
-            return;
-          state.completed = true;
-          state.running = false;
-          state.elapsed += Math.floor(
-            (performance.now() - state.startedAt) / 1000,
-          );
-          clearInterval(state.timerId);
-          localStorage.removeItem(STORAGE_KEY);
-          const key = `${state.imageId}:${state.pieces.length}`;
-          const records = readJson(RECORDS_KEY, {});
-          const isRecord = !records[key] || state.elapsed < records[key];
-          if (isRecord) {
-            records[key] = state.elapsed;
-            writeJson(RECORDS_KEY, records);
-          }
-          const collection = readJson(COLLECTION_KEY, []);
-          if (!collection.includes(key)) {
-            collection.push(key);
-            writeJson(COLLECTION_KEY, collection);
-          }
-          $("#victoryImage").src = state.imageSrc;
-          $("#victoryStats").textContent =
-            `${formatTime(state.elapsed)} · ${state.moves} ${pluralMoves(state.moves)} · ${state.pieces.length} деталей`;
-          $("#recordBadge").classList.toggle("hidden", !isRecord);
-          $("#victoryModal").classList.remove("hidden");
-          playVictory();
-          if (!reducedMotion) runConfetti();
-        }
-
-        function updateTimer() {
-          if (!state.running) return;
-          const total =
-            state.elapsed +
-            Math.floor((performance.now() - state.startedAt) / 1000);
-          $("#timer").textContent = formatTime(total);
-        }
-
-        function updateHud() {
-          const largest = Math.max(
-            1,
-            ...[...state.clusters.values()].map((set) => set.size),
-          );
-          const progress =
-            state.pieces.length === 1
-              ? 100
-              : Math.round(((largest - 1) / (state.pieces.length - 1)) * 100);
-          $("#moves").textContent = state.moves;
-          $("#progress").textContent = progress + "%";
-          $("#trayCount").textContent =
-            `${state.clusters.size} ${pluralClusters(state.clusters.size)}`;
-          updateTimer();
-        }
-
-        function buildTray() {
-          const tray = $("#trayList");
-          tray.innerHTML = "";
-          const representatives = [...state.clusters.values()].map(
-            (ids) => state.pieces[ids.values().next().value],
-          );
-          representatives.sort((a, b) => a.id - b.id);
-          for (const piece of representatives) {
-            const button = document.createElement("button");
-            button.className = "piece-chip";
-            button.type = "button";
-            button.title = `Показать кластер из ${state.clusters.get(piece.cluster).size} деталей`;
-            const preview = document.createElement("canvas");
-            preview.width = preview.height = 64;
-            const c = preview.getContext("2d");
-            const s = Math.min(
-              58 / piece.bitmap.width,
-              58 / piece.bitmap.height,
-            );
-            c.drawImage(
-              piece.bitmap,
-              (64 - piece.bitmap.width * s) / 2,
-              (64 - piece.bitmap.height * s) / 2,
-              piece.bitmap.width * s,
-              piece.bitmap.height * s,
-            );
-            button.append(preview);
-            button.addEventListener("click", () => focusCluster(piece.cluster));
-            tray.append(button);
-          }
-        }
-
-        function focusCluster(clusterId) {
-          const ids = state.clusters.get(clusterId);
-          if (!ids) return;
-          let minX = Infinity,
-            minY = Infinity,
-            maxX = -Infinity,
-            maxY = -Infinity;
-          const cw = state.boardW / state.cols,
-            ch = state.boardH / state.rows;
-          for (const id of ids) {
-            const p = state.pieces[id];
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x + cw);
-            maxY = Math.max(maxY, p.y + ch);
-          }
-          const wanted = clamp(
-            Math.min(
-              (state.viewW / Math.max(120, maxX - minX)) * 0.45,
-              (state.viewH / Math.max(120, maxY - minY)) * 0.45,
-            ),
-            0.3,
-            2.2,
-          );
-          state.camera.scale = wanted;
-          state.camera.x = state.viewW / 2 - ((minX + maxX) / 2) * wanted;
-          state.camera.y = state.viewH / 2 - ((minY + maxY) / 2) * wanted;
-          scheduleDraw();
-        }
-
-        function zoomAt(sx, sy, factor) {
-          const old = state.camera.scale;
-          const next = clamp(old * factor, 0.15, 3.5);
-          const wx = (sx - state.camera.x) / old,
-            wy = (sy - state.camera.y) / old;
-          state.camera.scale = next;
-          state.camera.x = sx - wx * next;
-          state.camera.y = sy - wy * next;
-          scheduleDraw();
-        }
-
-        function feedback() {
-          if (state.sound) playTone(520, 0.055, "sine", 0.055);
-          if (navigator.vibrate) navigator.vibrate(30);
-        }
-
-        let audioContext;
-        function playTone(
-          frequency,
-          duration,
-          type = "sine",
-          volume = 0.05,
-          delay = 0,
-        ) {
-          if (!state.sound) return;
-          try {
-            audioContext ||= new (
-              window.AudioContext || window.webkitAudioContext
-            )();
-            const oscillator = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            oscillator.frequency.value = frequency;
-            oscillator.type = type;
-            gain.gain.setValueAtTime(volume, audioContext.currentTime + delay);
-            gain.gain.exponentialRampToValueAtTime(
-              0.001,
-              audioContext.currentTime + delay + duration,
-            );
-            oscillator.connect(gain).connect(audioContext.destination);
-            oscillator.start(audioContext.currentTime + delay);
-            oscillator.stop(audioContext.currentTime + delay + duration);
-          } catch (_) {}
-        }
-        function playVictory() {
-          if (!state.sound) return;
-          [523, 659, 784, 1047].forEach((frequency, index) =>
-            playTone(frequency, 0.28, "sine", 0.05, index * 0.09),
-          );
-        }
-
-        function scheduleSave() {
-          clearTimeout(state.saveTimer);
-          state.saveTimer = setTimeout(saveGame, 250);
-        }
-
-        function saveGame() {
-          if (!state.running || state.completed) return;
-          const elapsed =
-            state.elapsed +
-            Math.floor((performance.now() - state.startedAt) / 1000);
-          const data = {
-            version: 1,
-            imageId: state.imageId,
-            src: state.imageSrc,
-            seed: state.seed,
-            cols: state.cols,
-            rows: state.rows,
-            moves: state.moves,
-            elapsed,
-            camera: state.camera,
-            pieces: state.pieces.map((p) => ({
-              x: round(p.x),
-              y: round(p.y),
-              cluster: p.cluster,
-            })),
-          };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          } catch (_) {
-            showToast("Фото слишком большое для автосохранения");
-          }
-        }
-
-        async function resumeGame() {
-          const saved = readJson(STORAGE_KEY, null);
-          if (!saved?.src) return;
-          try {
-            await setupGame(
-              {
-                src: saved.src,
-                imageId: saved.imageId,
-                seed: saved.seed,
-                cols: saved.cols,
-                rows: saved.rows,
-              },
-              saved,
-            );
-          } catch (_) {
-            localStorage.removeItem(STORAGE_KEY);
-            renderStart();
-            showToast("Сохранение повреждено");
-          }
-        }
-
-        function leaveGame() {
-          saveGame();
-          state.running = false;
-          clearInterval(state.timerId);
-          $("#gameScreen").classList.add("hidden");
-          $("#startScreen").classList.remove("hidden");
-          renderStart();
-        }
-
-        function showOriginal() {
-          const overlay = $("#originalOverlay");
-          overlay.classList.add("show");
-          clearTimeout(showOriginal.timer);
-          showOriginal.timer = setTimeout(
-            () => overlay.classList.remove("show"),
-            2200,
-          );
-        }
-
-        function runConfetti() {
-          const c = $("#confetti"),
-            x = c.getContext("2d");
-          const rect = c.getBoundingClientRect();
-          c.width = rect.width * devicePixelRatio;
-          c.height = rect.height * devicePixelRatio;
-          x.scale(devicePixelRatio, devicePixelRatio);
-          const colors = [
-            "#176b87",
-            "#d9ed75",
-            "#efb85e",
-            "#dd5884",
-            "#ffffff",
-          ];
-          const bits = Array.from({ length: 70 }, (_, i) => ({
-            x: rect.width / 2,
-            y: rect.height * 0.45,
-            vx: (Math.random() - 0.5) * 9,
-            vy: -Math.random() * 9 - 3,
-            r: Math.random() * 5 + 3,
-            color: colors[i % colors.length],
-            a: Math.random() * 6,
-          }));
-          let frame = 0;
-          function animate() {
-            x.clearRect(0, 0, rect.width, rect.height);
-            bits.forEach((bit) => {
-              bit.x += bit.vx;
-              bit.y += bit.vy;
-              bit.vy += 0.22;
-              bit.a += 0.14;
-              x.save();
-              x.translate(bit.x, bit.y);
-              x.rotate(bit.a);
-              x.fillStyle = bit.color;
-              x.fillRect(-bit.r, -bit.r / 2, bit.r * 2, bit.r);
-              x.restore();
-            });
-            if (frame++ < 125) requestAnimationFrame(animate);
-          }
-          animate();
-        }
-
-        function showToast(message) {
-          const toast = $("#toast");
-          toast.textContent = message;
-          toast.classList.add("show");
-          clearTimeout(showToast.timer);
-          showToast.timer = setTimeout(
-            () => toast.classList.remove("show"),
-            2200,
-          );
-        }
-
-        function readJson(key, fallback) {
-          try {
-            return JSON.parse(localStorage.getItem(key)) ?? fallback;
-          } catch (_) {
-            return fallback;
-          }
-        }
-        function writeJson(key, value) {
-          try {
-            localStorage.setItem(key, JSON.stringify(value));
-          } catch (_) {}
-        }
-        function round(value) {
-          return Math.round(value * 100) / 100;
-        }
-        function clamp(value, min, max) {
-          return Math.max(min, Math.min(max, value));
-        }
-        function formatTime(seconds) {
-          const m = Math.floor(seconds / 60),
-            s = seconds % 60;
-          return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-        }
-        function pluralMoves(n) {
-          const m = n % 10,
-            h = n % 100;
-          return m === 1 && h !== 11
-            ? "ход"
-            : m >= 2 && m <= 4 && (h < 12 || h > 14)
-              ? "хода"
-              : "ходов";
-        }
-        function pluralClusters(n) {
-          const m = n % 10,
-            h = n % 100;
-          return m === 1 && h !== 11
-            ? "кластер"
-            : m >= 2 && m <= 4 && (h < 12 || h > 14)
-              ? "кластера"
-              : "кластеров";
-        }
-
-        $("#startButton").addEventListener("click", startNewGame);
-        $("#resumeButton").addEventListener("click", resumeGame);
-        $("#backButton").addEventListener("click", leaveGame);
-        $("#hintButton").addEventListener("click", showOriginal);
-        $("#soundButton").addEventListener("click", () => {
-          state.sound = !state.sound;
-          $("#soundButton").textContent = state.sound ? "♪" : "×";
-          $("#soundButton").setAttribute(
-            "aria-label",
-            state.sound ? "Выключить звук" : "Включить звук",
-          );
-          writeJson(SETTINGS_KEY, { sound: state.sound });
-          if (state.sound) playTone(440, 0.08);
-        });
-        $("#zoomIn").addEventListener("click", () =>
-          zoomAt(state.viewW / 2, state.viewH / 2, 1.3),
-        );
-        $("#zoomOut").addEventListener("click", () =>
-          zoomAt(state.viewW / 2, state.viewH / 2, 1 / 1.3),
-        );
-        $("#fitButton").addEventListener("click", () => fitView());
-        $("#menuButton").addEventListener("click", () => {
-          $("#victoryModal").classList.add("hidden");
-          leaveGame();
-        });
-        $("#againButton").addEventListener("click", async () => {
-          $("#victoryModal").classList.add("hidden");
-          await setupGame({
-            src: state.imageSrc,
-            imageId: state.imageId,
-            seed: state.seed,
-            cols: state.cols,
-            rows: state.rows,
-          });
-        });
-        window.addEventListener("resize", resizeCanvas);
-        window.addEventListener("pagehide", saveGame);
-        document.addEventListener("visibilitychange", () => {
-          if (document.hidden) saveGame();
-        });
-
-        state.sound = readJson(SETTINGS_KEY, { sound: true }).sound !== false;
-        $("#soundButton").textContent = state.sound ? "♪" : "×";
-        renderStart();
-      })();
-    </script>
-  </body>
+    document.getElementById('startBest').textContent = best;
+    document.getElementById('startDaily').textContent = daily;
+    resize();
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
 </html>
