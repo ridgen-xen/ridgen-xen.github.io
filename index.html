@@ -1,718 +1,464 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#f6d7bd">
-  <title>Sushi Tower Stack</title>
-  <style>
-    :root {
-      color-scheme: light;
-      font-family: "Trebuchet MS", "Arial Rounded MT Bold", system-ui, sans-serif;
-    }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
-    body { background: #f7dfc9; touch-action: none; user-select: none; }
-    canvas { display: block; width: 100%; height: 100%; }
-    #hud {
-      position: fixed;
-      z-index: 3;
-      inset: max(12px, env(safe-area-inset-top)) 0 auto;
-      color: #452b28;
-      text-align: center;
-      pointer-events: none;
-      text-shadow: 0 2px 0 rgba(255,255,255,.55);
-    }
-    #score { font-size: clamp(34px, 10vw, 54px); font-weight: 900; line-height: .95; letter-spacing: -2px; }
-    #level { margin-top: 6px; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; opacity: .72; }
-    #power {
-      display: inline-block;
-      min-height: 26px;
-      margin-top: 9px;
-      padding: 5px 11px;
-      border: 1px solid rgba(69,43,40,.15);
-      border-radius: 99px;
-      background: rgba(255,255,255,.58);
-      font-size: 12px;
-      font-weight: 800;
-      opacity: 0;
-      transform: translateY(-5px);
-      transition: opacity .25s, transform .25s;
-      backdrop-filter: blur(5px);
-    }
-    #power.show { opacity: 1; transform: translateY(0); }
-    #message {
-      position: fixed;
-      z-index: 4;
-      left: 50%; top: 27%;
-      transform: translate(-50%, 10px) scale(.9);
-      color: #fff;
-      font-size: clamp(24px, 8vw, 42px);
-      font-weight: 1000;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      text-shadow: 0 3px 0 #ba4a4a, 0 7px 22px rgba(83,36,29,.32);
-    }
-    #message.pop { animation: pop .85s cubic-bezier(.2,.85,.25,1); }
-    @keyframes pop {
-      0% { opacity: 0; transform: translate(-50%, 14px) scale(.75); }
-      22%, 68% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-      100% { opacity: 0; transform: translate(-50%, -24px) scale(1.08); }
-    }
-    .screen {
-      position: fixed;
-      z-index: 10;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
-      background: linear-gradient(165deg, rgba(255,247,232,.35), rgba(245,190,166,.3));
-      transition: opacity .3s, visibility .3s;
-    }
-    .screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-    .card {
-      width: min(100%, 390px);
-      padding: 34px 26px 27px;
-      border: 1px solid rgba(83,45,38,.12);
-      border-radius: 30px;
-      background: rgba(255,251,242,.88);
-      box-shadow: 0 24px 80px rgba(103,55,42,.18), inset 0 1px #fff;
-      text-align: center;
-      backdrop-filter: blur(12px);
-    }
-    .stamp {
-      display: grid;
-      place-items: center;
-      width: 67px; height: 67px;
-      margin: -3px auto 16px;
-      border: 4px solid #df5d59;
-      border-radius: 18px;
-      color: #df5d59;
-      font-size: 35px;
-      font-weight: 900;
-      transform: rotate(-5deg);
-    }
-    h1 { margin: 0; color: #34211f; font-size: clamp(37px, 12vw, 58px); line-height: .84; letter-spacing: -3px; }
-    h1 span { display: block; color: #df5d59; font-size: .62em; letter-spacing: 4px; text-transform: uppercase; }
-    .tagline { margin: 18px auto 24px; color: #7b615b; font-size: 14px; line-height: 1.5; }
-    .stats { display: flex; justify-content: center; gap: 26px; margin: 20px 0; color: #76534c; }
-    .stat b { display: block; color: #33211f; font-size: 25px; }
-    .stat small { font-size: 10px; font-weight: 800; letter-spacing: 1.3px; text-transform: uppercase; }
-    button {
-      width: 100%; min-height: 55px;
-      border: 0; border-radius: 17px;
-      background: #df5d59;
-      color: #fff;
-      font: 900 17px/1 inherit;
-      box-shadow: 0 7px 0 #b84445, 0 12px 22px rgba(184,68,69,.24);
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    button:active { transform: translateY(4px); box-shadow: 0 3px 0 #b84445; }
-    button.secondary { margin-top: 13px; background: #f0dfcc; color: #5c403a; box-shadow: 0 6px 0 #d5baa3; }
-    .hint { margin: 18px 0 0; color: #9a7e76; font-size: 11px; }
-    #gameover h2 { margin: 0; color: #392421; font-size: 38px; letter-spacing: -2px; }
-    #shareStatus { height: 18px; margin: 12px 0 -4px; color: #64814f; font-size: 12px; font-weight: 700; }
-    @media (max-height: 620px) {
-      .card { padding-top: 23px; padding-bottom: 22px; }
-      .stamp { width: 51px; height: 51px; margin-bottom: 11px; font-size: 27px; }
-      .tagline { margin: 12px 0 16px; }
-      .stats { margin: 13px 0; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор цены продажи</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#0F1420;
+  --panel:#161D2E;
+  --panel-2:#1C2438;
+  --line:#262F45;
+  --text:#EDEFF4;
+  --text-dim:#8189A0;
+  --gold:#E8A33D;
+  --gold-dim:#7A5B25;
+  --teal:#4FD1C5;
+  --coral:#E8654F;
+  --radius:10px;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;
+  padding:28px 18px 60px;
+}
+
+.app{max-width:980px;margin:0 auto;}
+
+header{margin-bottom:28px;}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.14em;
+  color:var(--gold);
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+h1{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:28px;
+  font-weight:600;
+  margin:0 0 6px;
+  letter-spacing:-0.01em;
+}
+.sub{color:var(--text-dim);font-size:14px;line-height:1.5;max-width:560px;}
+
+.grid{
+  display:grid;
+  grid-template-columns:360px 1fr;
+  gap:16px;
+  align-items:start;
+}
+@media (max-width:760px){
+  .grid{grid-template-columns:1fr;}
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+}
+
+.panel h2{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--text-dim);
+  margin:0 0 16px;
+}
+
+.field{margin-bottom:16px;}
+.field:last-child{margin-bottom:0;}
+.field label{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  font-size:13px;
+  color:var(--text-dim);
+  margin-bottom:6px;
+}
+.field label .val{
+  font-family:'IBM Plex Mono',monospace;
+  color:var(--gold);
+  font-weight:600;
+  font-size:13px;
+}
+.field input[type="number"]{
+  width:100%;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:6px;
+  color:var(--text);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:15px;
+  padding:9px 10px;
+  outline:none;
+}
+.field input[type="number"]:focus{border-color:var(--gold);}
+.field input[type="range"]{
+  width:100%;
+  accent-color:var(--gold);
+}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+.toggle-group{
+  display:flex;
+  border:1px solid var(--line);
+  border-radius:6px;
+  overflow:hidden;
+}
+.toggle-group button{
+  flex:1;
+  background:var(--panel-2);
+  border:none;
+  color:var(--text-dim);
+  font-family:'Inter',sans-serif;
+  font-size:12.5px;
+  padding:8px 6px;
+  cursor:pointer;
+  transition:background .15s, color .15s;
+}
+.toggle-group button.active{
+  background:var(--gold-dim);
+  color:var(--gold);
+  font-weight:600;
+}
+
+.checkline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  color:var(--text-dim);
+  margin-top:4px;
+}
+.checkline input{accent-color:var(--gold);}
+
+hr.sep{
+  border:none;
+  border-top:1px solid var(--line);
+  margin:18px 0;
+}
+
+/* --- output board --- */
+.board-wrap{
+  text-align:center;
+  padding:22px 10px 26px;
+  border-bottom:1px solid var(--line);
+  margin-bottom:18px;
+}
+.board-label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:var(--text-dim);
+  margin-bottom:12px;
+}
+.board{
+  display:inline-flex;
+  gap:4px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.digit{
+  background:linear-gradient(180deg,#232C42 0%,#1A2135 100%);
+  border:1px solid var(--line);
+  border-top:1px solid #37415C;
+  border-radius:6px;
+  min-width:30px;
+  padding:10px 4px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:30px;
+  font-weight:600;
+  color:var(--gold);
+  text-align:center;
+  box-shadow:0 1px 0 rgba(0,0,0,0.4) inset, 0 4px 10px rgba(0,0,0,0.25);
+  position:relative;
+}
+.digit::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:50%;
+  height:1px;
+  background:rgba(0,0,0,0.35);
+}
+.digit.sep{
+  background:none;border:none;box-shadow:none;
+  min-width:10px;color:var(--text-dim);font-size:24px;
+  display:flex;align-items:center;justify-content:center;
+}
+.board-sub{
+  margin-top:10px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:13px;
+  color:var(--text-dim);
+}
+.board-sub b{color:var(--teal);}
+
+.ledger{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+.ledger-row{
+  display:flex;
+  justify-content:space-between;
+  padding:9px 0;
+  border-bottom:1px dashed var(--line);
+  gap:12px;
+}
+.ledger-row:last-child{border-bottom:none;}
+.ledger-row .k{color:var(--text-dim);}
+.ledger-row .v{color:var(--text);font-weight:500;white-space:nowrap;}
+.ledger-row.total .k, .ledger-row.total .v{color:var(--gold);font-weight:700;}
+.ledger-row.profit .v{color:var(--teal);}
+
+/* comparison table */
+.tbl-wrap{margin-top:16px;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+th,td{padding:9px 10px;text-align:right;white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;}
+th{color:var(--text-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--line);}
+td{border-bottom:1px solid var(--line);color:var(--text);}
+tr.current td{background:rgba(232,163,61,0.08);color:var(--gold);font-weight:600;}
+
+.footnote{
+  margin-top:18px;
+  font-size:12px;
+  color:var(--text-dim);
+  line-height:1.5;
+}
+</style>
 </head>
 <body>
-  <canvas id="game" aria-label="Игровое поле Sushi Tower Stack"></canvas>
+<div class="app">
+  <header>
+    <div class="eyebrow">Калькулятор · цифровые товары</div>
+    <h1>Цена продажи</h1>
+    <div class="sub">Закуп → комиссия площадки-источника → комиссии маркетплейса и вывода → цена с нужной маржой. Все параметры настраиваемые.</div>
+  </header>
 
-  <div id="hud" hidden>
-    <div id="score">0</div>
-    <div id="level">Этаж 1</div>
-    <div id="power"></div>
+  <div class="grid">
+    <!-- INPUTS -->
+    <div class="panel">
+      <h2>Параметры</h2>
+
+      <div class="field">
+        <label>Закуп за 1000 шт <span class="val" id="v-buy">$4.30</span></label>
+        <input type="number" id="buy" value="4.3" step="0.01" min="0">
+      </div>
+
+      <div class="field">
+        <label>Комиссия площадки-источника (напр. Roblox геймпасс) <span class="val" id="v-platform">30%</span></label>
+        <input type="range" id="platform" min="0" max="60" step="1" value="30">
+      </div>
+
+      <hr class="sep">
+
+      <div class="field">
+        <label>Модель комиссии маркетплейса (FunPay/Starvell)</label>
+        <div class="toggle-group" id="funpayMode">
+          <button data-v="ontop" class="active">Сверху у покупателя</button>
+          <button data-v="deducted">Вычитается у продавца</button>
+        </div>
+      </div>
+
+      <div class="field" id="funpayPctWrap" style="display:none;">
+        <label>Комиссия маркетплейса <span class="val" id="v-funpay">10%</span></label>
+        <input type="range" id="funpay" min="0" max="30" step="0.5" value="10">
+      </div>
+
+      <hr class="sep">
+
+      <div class="field">
+        <label>Комиссия вывода <span class="val" id="v-withdraw">6%</span></label>
+        <input type="range" id="withdraw" min="0" max="20" step="0.5" value="6">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Фикс. комиссия ($)</label>
+          <input type="number" id="fixedFee" value="1" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label>Сумма вывода ($)</label>
+          <input type="number" id="withdrawAmt" value="300" step="10" min="1">
+        </div>
+      </div>
+      <div class="checkline">
+        <input type="checkbox" id="useFixed" checked>
+        <label for="useFixed" style="margin:0;">учитывать фикс. комиссию (размазать на сумму вывода)</label>
+      </div>
+
+      <hr class="sep">
+
+      <div class="field">
+        <label>Целевая маржа (наценка на себестоимость) <span class="val" id="v-margin">15%</span></label>
+        <input type="range" id="margin" min="0" max="60" step="1" value="15">
+      </div>
+
+      <div class="field">
+        <label>Курс USD → RUB <span class="val" id="v-rate">77.0</span></label>
+        <input type="number" id="rate" value="77" step="0.1" min="1">
+      </div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="panel">
+      <div class="board-wrap">
+        <div class="board-label">Цена за 1 шт, ₽</div>
+        <div class="board" id="board"></div>
+        <div class="board-sub">≈ <b id="board-usd">$0.00</b> за 1000 шт &nbsp;·&nbsp; профит <b id="board-profit">$0.00</b> на 1000 проданных</div>
+      </div>
+
+      <div class="ledger" id="ledger"></div>
+    </div>
   </div>
-  <div id="message"></div>
 
-  <section id="start" class="screen">
-    <div class="card">
-      <div class="stamp">鮨</div>
-      <h1>Sushi <span>Tower Stack</span></h1>
-      <p class="tagline">Лови ритм. Режь точно.<br>Построй самую высокую суши-башню.</p>
-      <div class="stats">
-        <div class="stat"><b id="startBest">0</b><small>Рекорд</small></div>
-        <div class="stat"><b id="startDaily">0</b><small>Сегодня</small></div>
-      </div>
-      <button id="play">Играть</button>
-      <p class="hint">Тап по экрану или пробел</p>
+  <div class="panel" style="margin-top:16px;">
+    <h2>Сравнение по марже</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Маржа</th><th>USD / 1000</th><th>₽ / 1000</th><th>₽ / 1 шт</th><th>Профит с 1000</th></tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
     </div>
-  </section>
+  </div>
 
-  <section id="gameover" class="screen hidden">
-    <div class="card">
-      <div class="stamp">終</div>
-      <h2>Башня упала</h2>
-      <div class="stats">
-        <div class="stat"><b id="finalScore">0</b><small>Счёт</small></div>
-        <div class="stat"><b id="finalBest">0</b><small>Рекорд</small></div>
-      </div>
-      <button id="again">Заново</button>
-      <button id="share" class="secondary">Поделиться результатом</button>
-      <div id="shareStatus"></div>
-    </div>
-  </section>
+  <div class="footnote">
+    Формула: реальный закуп = закуп ÷ (1 − комиссия площадки-источника). Цель = реальный закуп × (1 + маржа). Эффективная ставка вывода = комиссия% + (фикс/сумма вывода). Итоговая цена считается так, чтобы после всех комиссий на руках оставалась именно целевая сумма.
+  </div>
+</div>
 
-  <script>
-  (() => {
-    'use strict';
+<script>
+const $ = id => document.getElementById(id);
 
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const hud = document.getElementById('hud');
-    const scoreEl = document.getElementById('score');
-    const levelEl = document.getElementById('level');
-    const powerEl = document.getElementById('power');
-    const messageEl = document.getElementById('message');
-    const startScreen = document.getElementById('start');
-    const overScreen = document.getElementById('gameover');
-    const shareStatus = document.getElementById('shareStatus');
+let funpayModeVal = 'ontop';
 
-    const store = {
-      get(key, fallback = 0) {
-        try { return Number(localStorage.getItem(key)) || fallback; } catch (_) { return fallback; }
-      },
-      set(key, value) {
-        try { localStorage.setItem(key, String(value)); } catch (_) {}
-      }
-    };
+document.querySelectorAll('#funpayMode button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#funpayMode button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    funpayModeVal = btn.dataset.v;
+    $('funpayPctWrap').style.display = funpayModeVal === 'deducted' ? 'block' : 'none';
+    calc();
+  });
+});
 
-    const today = new Date().toISOString().slice(0, 10);
-    let best = store.get('sushiTowerBest');
-    let daily = store.get('sushiTowerDate') === today ? store.get('sushiTowerDaily') : 0;
-    if (store.get('sushiTowerDate') !== today) {
-      store.set('sushiTowerDate', today);
-      store.set('sushiTowerDaily', 0);
+['buy','platform','funpay','withdraw','fixedFee','withdrawAmt','margin','rate'].forEach(id=>{
+  $(id).addEventListener('input', calc);
+});
+$('useFixed').addEventListener('change', calc);
+
+function fmt(n, d=2){
+  return n.toLocaleString('ru-RU', {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+
+function computeFor(buy, platformPct, funpayMode, funpayPct, withdrawPct, fixedFee, withdrawAmt, useFixed, marginPct, rate){
+  const realCost = buy / (1 - platformPct/100);
+  const target = realCost * (1 + marginPct/100);
+  const effWithdrawRate = (withdrawPct/100) + (useFixed && withdrawAmt > 0 ? fixedFee/withdrawAmt : 0);
+  const B = target / (1 - effWithdrawRate); // amount seller must have credited on balance
+  const P = funpayMode === 'deducted' ? B / (1 - funpayPct/100) : B; // listed price per 1000
+  const profit = target - realCost;
+  return {realCost, target, effWithdrawRate, B, P, profit, priceRub1000: P*rate, priceRubUnit: (P*rate)/1000};
+}
+
+function calc(){
+  const buy = parseFloat($('buy').value) || 0;
+  const platformPct = parseFloat($('platform').value) || 0;
+  const funpayPct = parseFloat($('funpay').value) || 0;
+  const withdrawPct = parseFloat($('withdraw').value) || 0;
+  const fixedFee = parseFloat($('fixedFee').value) || 0;
+  const withdrawAmt = parseFloat($('withdrawAmt').value) || 1;
+  const useFixed = $('useFixed').checked;
+  const marginPct = parseFloat($('margin').value) || 0;
+  const rate = parseFloat($('rate').value) || 1;
+
+  $('v-buy').textContent = '$' + fmt(buy);
+  $('v-platform').textContent = platformPct + '%';
+  $('v-funpay').textContent = funpayPct + '%';
+  $('v-withdraw').textContent = withdrawPct + '%';
+  $('v-margin').textContent = marginPct + '%';
+  $('v-rate').textContent = fmt(rate,1);
+
+  const r = computeFor(buy, platformPct, funpayModeVal, funpayPct, withdrawPct, fixedFee, withdrawAmt, useFixed, marginPct, rate);
+
+  renderBoard(r.priceRubUnit);
+  $('board-usd').textContent = '$' + fmt(r.P);
+  $('board-profit').textContent = '$' + fmt(r.profit);
+
+  const ledgerRows = [
+    ['Закуп за 1000', '$' + fmt(buy)],
+    [`Реальный закуп (÷ (1−${platformPct}%))`, '$' + fmt(r.realCost)],
+    [`Себестоимость + маржа (${marginPct}%)`, '$' + fmt(r.target)],
+    [`Эфф. ставка вывода`, fmt(r.effWithdrawRate*100,1) + '%'],
+    [`Нужно на балансе (до вывода)`, '$' + fmt(r.B)],
+  ];
+  if(funpayModeVal === 'deducted'){
+    ledgerRows.push([`С учётом комиссии маркетплейса (${funpayPct}%)`, '$' + fmt(r.P)]);
+  }
+  ledgerRows.push(['__TOTAL__', '']);
+  ledgerRows.push(['__PROFIT__', '']);
+
+  let html = '';
+  ledgerRows.forEach(([k,v])=>{
+    if(k === '__TOTAL__'){
+      html += `<div class="ledger-row total"><span class="k">Цена продажи / 1000</span><span class="v">$${fmt(r.P)} · ₽${fmt(r.priceRub1000)} · ₽${fmt(r.priceRubUnit,4)}/шт</span></div>`;
+    } else if(k === '__PROFIT__'){
+      html += `<div class="ledger-row profit"><span class="k">Чистый профит с 1000 проданных</span><span class="v">$${fmt(r.profit)}</span></div>`;
+    } else {
+      html += `<div class="ledger-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
     }
+  });
+  $('ledger').innerHTML = html;
 
-    let W = 0, H = 0, dpr = 1;
-    let gameState = 'menu';
-    let layers = [];
-    let mover = null;
-    let debris = [];
-    let particles = [];
-    let score = 0;
-    let level = 1;
-    let combo = 0;
-    let initialWidth = 0;
-    let minWidth = 0;
-    let camera = 0;
-    let cameraTarget = 0;
-    let lastTime = performance.now();
-    let shake = 0;
-    let flash = 0;
-    let guideUntil = 0;
-    let soyShield = false;
-    let slowNext = false;
-    let direction = 1;
-    let audioCtx = null;
-    let powerTimer = 0;
+  // comparison table across fixed margin presets
+  const presets = [0,10,15,20,25,30];
+  let rowsHtml = '';
+  presets.forEach(m=>{
+    const rr = computeFor(buy, platformPct, funpayModeVal, funpayPct, withdrawPct, fixedFee, withdrawAmt, useFixed, m, rate);
+    const isCurrent = m === marginPct;
+    rowsHtml += `<tr class="${isCurrent?'current':''}">
+      <td>${m}%</td>
+      <td>$${fmt(rr.P)}</td>
+      <td>₽${fmt(rr.priceRub1000)}</td>
+      <td>₽${fmt(rr.priceRubUnit,4)}</td>
+      <td>$${fmt(rr.profit)}</td>
+    </tr>`;
+  });
+  $('tbl-body').innerHTML = rowsHtml;
+}
 
-    function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      W = innerWidth;
-      H = innerHeight;
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (gameState === 'menu') draw(performance.now());
+function renderBoard(priceRubUnit){
+  const str = fmt(priceRubUnit, 4); // e.g. "0,6123"
+  const board = $('board');
+  board.innerHTML = '';
+  for(const ch of str){
+    const cell = document.createElement('div');
+    if(ch === ',' || ch === '.'){
+      cell.className = 'digit sep';
+      cell.textContent = ',';
+    } else {
+      cell.className = 'digit';
+      cell.textContent = ch;
     }
+    board.appendChild(cell);
+  }
+}
 
-    function roundedRect(x, y, w, h, r) {
-      r = Math.min(r, w / 2, h / 2);
-      ctx.beginPath();
-      ctx.roundRect(x, y, w, h, r);
-    }
-
-    function backgroundTheme() {
-      const phase = Math.floor(Math.max(0, level - 1) / 15) % 4;
-      return [
-        ['#fff4df', '#f3c6b3', '#7aa87d'],
-        ['#ffd5b5', '#d9847d', '#8d4d67'],
-        ['#263752', '#10192d', '#86b6c8'],
-        ['#35204f', '#101327', '#ff5f91']
-      ][phase];
-    }
-
-    function drawBackground(now) {
-      const theme = backgroundTheme();
-      const gradient = ctx.createLinearGradient(0, 0, 0, H);
-      gradient.addColorStop(0, theme[0]);
-      gradient.addColorStop(1, theme[1]);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, W, H);
-
-      ctx.globalAlpha = .13;
-      ctx.fillStyle = theme[2];
-      for (let i = 0; i < 9; i++) {
-        const x = ((i * 173 + 42) % (W + 100)) - 50;
-        const y = 55 + (i % 4) * 86;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(i * .7 + Math.sin(now / 2400 + i) * .08);
-        for (let p = 0; p < 5; p++) {
-          ctx.rotate(Math.PI * 2 / 5);
-          ctx.beginPath();
-          ctx.ellipse(0, 8, 5, 10, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-      ctx.globalAlpha = 1;
-
-      const boardY = H - 82 + camera;
-      ctx.fillStyle = 'rgba(69,37,29,.16)';
-      ctx.fillRect(0, boardY + 13, W, 80);
-      const wood = ctx.createLinearGradient(0, boardY, 0, boardY + 68);
-      wood.addColorStop(0, '#d49a63');
-      wood.addColorStop(1, '#a9673f');
-      ctx.fillStyle = wood;
-      roundedRect(-18, boardY, W + 36, 82, 20);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(88,49,31,.2)';
-      ctx.lineWidth = 2;
-      for (let y = boardY + 14; y < boardY + 75; y += 13) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y + Math.sin(y) * 2); ctx.stroke();
-      }
-    }
-
-    function layerPalette(type, skin) {
-      const classic = [
-        ['#faf1d6', '#e8d7b4', '#f28b72'],
-        ['#273c34', '#15271f', '#f6f0d8'],
-        ['#202f29', '#12211c', '#f09c48'],
-        ['#f2c27e', '#d9915e', '#fff1ce'],
-        ['#faf0d6', '#dfcbaa', '#e95758']
-      ];
-      const spicy = [['#fff0cf','#e3c392','#e65043'],['#762f2b','#421f22','#ffd169'],['#54241f','#321615','#ef673f'],['#ee975f','#bf503c','#fff1ce'],['#ffe8bc','#e0b77e','#ff493b']];
-      const gold = [['#fff4be','#d9a62e','#fff08c'],['#b07a19','#6f4812','#fff4bb'],['#72511c','#3d2d13','#ffc83d'],['#f8ca47','#bd7d16','#fff4bc'],['#ffe9a0','#ca941e','#fff8cc']];
-      return (skin === 2 ? gold : skin === 1 ? spicy : classic)[type % 5];
-    }
-
-    function drawSushi(layer, alpha = 1) {
-      if (layer.w <= 0) return;
-      const x = layer.x;
-      const y = layer.y + camera;
-      const w = layer.w;
-      const h = layer.h;
-      const type = layer.type % 5;
-      const p = layerPalette(type, layer.skin || 0);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.shadowColor = 'rgba(54,31,25,.24)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 5;
-      roundedRect(x, y, w, h, Math.min(9, w / 5));
-      ctx.fillStyle = p[0];
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-
-      const shade = ctx.createLinearGradient(0, y, 0, y + h);
-      shade.addColorStop(0, 'rgba(255,255,255,.24)');
-      shade.addColorStop(1, 'rgba(52,28,22,.16)');
-      ctx.fillStyle = shade;
-      roundedRect(x, y, w, h, Math.min(9, w / 5));
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(56,33,27,.27)';
-      ctx.lineWidth = 1.4;
-      roundedRect(x + .7, y + .7, Math.max(0, w - 1.4), h - 1.4, Math.min(9, w / 5));
-      ctx.stroke();
-
-      if (type === 0) {
-        ctx.fillStyle = p[2];
-        roundedRect(x - 2, y - 5, w + 4, h * .48, Math.min(10, w / 4));
-        ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,.26)';
-        roundedRect(x + 5, y - 2, Math.max(0, w * .6), 3, 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(122,43,39,.25)';
-        for (let i = 12; i < w; i += 22) { ctx.beginPath(); ctx.moveTo(x + i, y - 3); ctx.lineTo(x + i - 7, y + 8); ctx.stroke(); }
-      } else if (type === 1) {
-        ctx.fillStyle = p[1];
-        roundedRect(x, y, w, h, Math.min(9, w / 5)); ctx.fill();
-        const count = Math.max(1, Math.floor(w / 35));
-        for (let i = 0; i < count; i++) {
-          const cx = x + (i + .5) * w / count;
-          ctx.fillStyle = p[2]; ctx.beginPath(); ctx.ellipse(cx, y + h / 2, Math.min(13, w / count * .37), h * .35, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = i % 2 ? '#79a95e' : '#e76455'; ctx.beginPath(); ctx.arc(cx, y + h / 2, Math.min(5, w / count * .15), 0, Math.PI * 2); ctx.fill();
-        }
-      } else if (type === 2) {
-        ctx.fillStyle = p[1]; roundedRect(x, y, w, h, 5); ctx.fill();
-        ctx.fillStyle = p[2]; roundedRect(x + 3, y - 4, Math.max(0, w - 6), h * .55, 5); ctx.fill();
-        ctx.fillStyle = '#91af50';
-        for (let i = 7; i < w - 3; i += 13) { ctx.beginPath(); ctx.arc(x + i, y + 3, 2.2, 0, Math.PI * 2); ctx.fill(); }
-      } else if (type === 3) {
-        ctx.fillStyle = p[2]; roundedRect(x, y, w, h, Math.min(8, w / 5)); ctx.fill();
-        ctx.fillStyle = p[0];
-        for (let i = 7; i < w; i += 12) { ctx.beginPath(); ctx.ellipse(x + i, y + h / 2, 2.5, 4, i, 0, Math.PI * 2); ctx.fill(); }
-        ctx.fillStyle = '#df7251'; roundedRect(x + w * .37, y + 5, w * .26, h - 10, 4); ctx.fill();
-      } else {
-        ctx.fillStyle = p[0]; roundedRect(x, y, w, h, 8); ctx.fill();
-        ctx.fillStyle = p[2]; roundedRect(x - 1, y - 3, w + 2, h * .42, 8); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,.38)'; ctx.lineWidth = 2;
-        for (let i = 8; i < w; i += 18) { ctx.beginPath(); ctx.moveTo(x + i, y - 1); ctx.lineTo(x + i + 7, y + 7); ctx.stroke(); }
-      }
-
-      if ((layer.skin || 0) === 2) {
-        const gleam = ((performance.now() / 18) % (w + 50)) - 25;
-        ctx.globalAlpha *= .5;
-        ctx.strokeStyle = '#fffbe1'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(x + gleam - 9, y + h); ctx.lineTo(x + gleam + 9, y); ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function currentSkin() {
-      return best >= 2500 ? 2 : best >= 700 ? 1 : 0;
-    }
-
-    function resetGame() {
-      score = 0; level = 1; combo = 0; debris = []; particles = [];
-      camera = 0; cameraTarget = 0; shake = 0; flash = 0;
-      guideUntil = 0; soyShield = false; slowNext = false; direction = 1;
-      initialWidth = Math.min(W * .68, 285);
-      minWidth = initialWidth * .08;
-      const h = Math.max(28, Math.min(34, H * .045));
-      layers = [{ x: (W - initialWidth) / 2, y: H - 116, w: initialWidth, h, type: 3, skin: currentSkin() }];
-      gameState = 'playing';
-      startScreen.classList.add('hidden');
-      overScreen.classList.add('hidden');
-      hud.hidden = false;
-      updateHud();
-      spawnMover();
-    }
-
-    function speedForLevel(n) {
-      const growth = 1 + .055 * Math.min(n, 20) + .018 * Math.log2(Math.max(1, n - 18)) * Math.max(0, n - 18);
-      return Math.min(W * 1.3, Math.max(170, W * .48) * growth);
-    }
-
-    function spawnMover() {
-      const top = layers[layers.length - 1];
-      direction *= -1;
-      const w = Math.max(minWidth, top.w);
-      const spawnLeft = direction > 0;
-      const reduction = slowNext ? .7 : 1;
-      mover = {
-        x: spawnLeft ? -w - 6 : W + 6,
-        y: top.y - top.h - Math.min(66, H * .08),
-        targetY: top.y - top.h,
-        w, h: top.h,
-        vx: speedForLevel(level) * direction * reduction,
-        type: level % 5,
-        skin: currentSkin(),
-        dropping: false,
-        vy: 0,
-        bounces: 0,
-        nextJuke: performance.now() + 550
-      };
-      slowNext = false;
-      cameraTarget = Math.max(0, H * .4 - mover.targetY);
-    }
-
-    function updateHud() {
-      scoreEl.textContent = score;
-      levelEl.textContent = `Этаж ${level}`;
-    }
-
-    function showMessage(text) {
-      messageEl.textContent = text;
-      messageEl.classList.remove('pop');
-      void messageEl.offsetWidth;
-      messageEl.classList.add('pop');
-    }
-
-    function showPower(text, duration = 2500) {
-      clearTimeout(powerTimer);
-      powerEl.textContent = text;
-      powerEl.classList.add('show');
-      powerTimer = setTimeout(() => powerEl.classList.remove('show'), duration);
-    }
-
-    function grantPowerup() {
-      const pick = (Math.floor(level / 8) - 1) % 3;
-      if (pick === 0) {
-        slowNext = true;
-        showPower('● Васаби: замедление');
-        showMessage('Васаби-буст!');
-      } else if (pick === 1) {
-        guideUntil = performance.now() + 3000;
-        showPower('╎ Палочки: точный центр', 3000);
-        showMessage('Палочки точности!');
-      } else {
-        soyShield = true;
-        showPower('◆ Соус: защита от среза', 5000);
-        showMessage('Соевый щит!');
-      }
-      sound('power');
-    }
-
-    function input() {
-      if (gameState !== 'playing' || !mover || mover.dropping) return;
-      unlockAudio();
-      mover.dropping = true;
-      mover.vy = 150;
-      if (navigator.vibrate) navigator.vibrate(12);
-    }
-
-    function landMover() {
-      const prev = layers[layers.length - 1];
-      const left = Math.max(mover.x, prev.x);
-      const right = Math.min(mover.x + mover.w, prev.x + prev.w);
-      let overlap = right - left;
-      const ratio = overlap / mover.w;
-      const centerDiff = Math.abs((mover.x + mover.w / 2) - (prev.x + prev.w / 2));
-      const perfect = centerDiff <= Math.max(3, prev.w * .025);
-
-      if (ratio < .12) {
-        addDebris({ ...mover }, mover.x < prev.x ? -1 : 1, true);
-        mover = null;
-        shake = 15;
-        sound('fail');
-        if (navigator.vibrate) navigator.vibrate([45, 35, 90]);
-        setTimeout(endGame, 650);
-        gameState = 'ending';
-        return;
-      }
-
-      if (perfect) {
-        combo++;
-        const oldX = mover.x;
-        mover.x = prev.x;
-        mover.w = prev.w;
-        score += 20 * (combo + 1);
-        flash = 1;
-        sparkle(prev.x, mover.targetY, prev.w);
-        showMessage(combo > 1 ? `Perfect · Комбо x${combo}!` : 'Perfect!');
-        if (Math.abs(oldX - prev.x) > 2) addTinyTrim(oldX, prev.x, mover.targetY, prev.h);
-        sound('perfect');
-        if (navigator.vibrate) navigator.vibrate([10, 20, 18]);
-      } else if (soyShield) {
-        soyShield = false;
-        combo = 0;
-        mover.x = prev.x;
-        mover.w = prev.w;
-        score += 10;
-        showMessage('Соус спас слой!');
-        showPower('Защита использована');
-        sound('power');
-      } else {
-        combo = 0;
-        score += 10;
-        if (mover.x < prev.x) {
-          addDebris({ ...mover, w: prev.x - mover.x }, -1);
-        } else if (mover.x + mover.w > prev.x + prev.w) {
-          addDebris({ ...mover, x: prev.x + prev.w, w: mover.x + mover.w - (prev.x + prev.w) }, 1);
-        }
-        mover.x = left;
-        mover.w = Math.max(minWidth, overlap);
-        if (ratio < .25) { shake = 9; showMessage('На грани!'); }
-        sound('cut');
-      }
-
-      mover.y = mover.targetY;
-      layers.push({ x: mover.x, y: mover.y, w: mover.w, h: mover.h, type: mover.type, skin: mover.skin });
-      mover = null;
-      level++;
-      updateHud();
-      if (level % 8 === 0) grantPowerup();
-      spawnMover();
-    }
-
-    function addTinyTrim(oldX, newX, y, h) {
-      const delta = oldX - newX;
-      if (Math.abs(delta) < 1) return;
-      addDebris({ x: delta < 0 ? oldX : newX + layers[layers.length - 1].w, y, w: Math.abs(delta), h, type: level % 5, skin: currentSkin() }, Math.sign(delta));
-    }
-
-    function addDebris(piece, side, missed = false) {
-      debris.push({
-        ...piece,
-        vx: side * (missed ? 95 : 55) + (Math.random() - .5) * 25,
-        vy: missed ? 30 : -35,
-        rotation: 0,
-        vr: side * (.9 + Math.random() * 1.6),
-        life: 0
-      });
-    }
-
-    function sparkle(x, y, w) {
-      for (let i = 0; i < 18; i++) {
-        particles.push({
-          x: x + Math.random() * w, y: y + Math.random() * 20,
-          vx: (Math.random() - .5) * 100, vy: -30 - Math.random() * 100,
-          life: .7 + Math.random() * .5, max: 1.2, size: 2 + Math.random() * 3
-        });
-      }
-    }
-
-    function update(dt, now) {
-      camera += (cameraTarget - camera) * Math.min(1, dt * 4.5);
-      shake *= Math.pow(.04, dt);
-      flash *= Math.pow(.08, dt);
-
-      if (gameState === 'playing' && mover) {
-        if (!mover.dropping) {
-          let velocity = mover.vx;
-          if (level > 10) {
-            const edge = Math.min(Math.max(mover.x, 0), Math.max(0, W - mover.x - mover.w));
-            velocity *= 1 + Math.max(0, 1 - edge / (W * .18)) * .15;
-          }
-          mover.x += velocity * dt;
-          if (mover.x <= -mover.w * .12 && mover.vx < 0) { mover.x = -mover.w * .12; mover.vx *= -1; mover.bounces++; }
-          if (mover.x + mover.w >= W + mover.w * .12 && mover.vx > 0) { mover.x = W - mover.w * .88; mover.vx *= -1; mover.bounces++; }
-          if (level >= 5 && now > mover.nextJuke && mover.bounces > 0 && level % 5 === 0) {
-            mover.vx *= -1;
-            mover.nextJuke = now + 650 + Math.random() * 650;
-          }
-          if (level > 10) mover.x += Math.sin(now * .028 + level) * Math.min(1.2, level * .035);
-        } else {
-          mover.vy += 1300 * dt;
-          mover.y += mover.vy * dt;
-          if (mover.y >= mover.targetY) landMover();
-        }
-      }
-
-      debris.forEach(p => {
-        p.life += dt; p.vy += 950 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rotation += p.vr * dt;
-      });
-      debris = debris.filter(p => p.y + camera < H + 180 && p.life < 4);
-      particles.forEach(p => { p.life -= dt; p.vy += 100 * dt; p.x += p.vx * dt; p.y += p.vy * dt; });
-      particles = particles.filter(p => p.life > 0);
-    }
-
-    function draw(now) {
-      ctx.save();
-      const sx = shake ? (Math.random() - .5) * shake : 0;
-      const sy = shake ? (Math.random() - .5) * shake : 0;
-      ctx.translate(sx, sy);
-      drawBackground(now);
-
-      layers.forEach(drawSushi);
-      if (mover) drawSushi(mover);
-
-      if (mover && now < guideUntil) {
-        const prev = layers[layers.length - 1];
-        const center = prev.x + prev.w / 2;
-        ctx.save();
-        ctx.setLineDash([6, 7]);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(91,128,72,.7)';
-        ctx.beginPath(); ctx.moveTo(center, mover.targetY + camera - 45); ctx.lineTo(center, prev.y + camera + prev.h); ctx.stroke();
-        ctx.restore();
-      }
-
-      debris.forEach(p => {
-        ctx.save();
-        ctx.translate(p.x + p.w / 2, p.y + p.h / 2 + camera);
-        ctx.rotate(p.rotation);
-        drawSushi({ ...p, x: -p.w / 2, y: -p.h / 2 - camera });
-        ctx.restore();
-      });
-
-      particles.forEach(p => {
-        ctx.globalAlpha = Math.min(1, p.life * 2);
-        ctx.fillStyle = '#fff7a8';
-        ctx.save(); ctx.translate(p.x, p.y + camera); ctx.rotate(Math.PI / 4);
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size); ctx.restore();
-      });
-      ctx.globalAlpha = 1;
-
-      if (flash > .01) {
-        ctx.fillStyle = `rgba(255,247,151,${flash * .2})`;
-        ctx.fillRect(0, 0, W, H);
-      }
-      ctx.restore();
-    }
-
-    function loop(now) {
-      const dt = Math.min(.033, (now - lastTime) / 1000);
-      lastTime = now;
-      update(dt, now);
-      draw(now);
-      requestAnimationFrame(loop);
-    }
-
-    function endGame() {
-      gameState = 'over';
-      best = Math.max(best, score);
-      daily = Math.max(daily, score);
-      store.set('sushiTowerBest', best);
-      store.set('sushiTowerDaily', daily);
-      document.getElementById('finalScore').textContent = score;
-      document.getElementById('finalBest').textContent = best;
-      document.getElementById('startBest').textContent = best;
-      document.getElementById('startDaily').textContent = daily;
-      shareStatus.textContent = '';
-      hud.hidden = true;
-      overScreen.classList.remove('hidden');
-    }
-
-    function unlockAudio() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-    }
-
-    function sound(kind) {
-      try {
-        unlockAudio();
-        const t = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        const data = {
-          cut: [180, 105, .11, 'sine'], perfect: [520, 880, .18, 'sine'],
-          fail: [145, 55, .35, 'triangle'], power: [340, 650, .22, 'sine']
-        }[kind] || [300, 180, .1, 'sine'];
-        osc.type = data[3]; osc.frequency.setValueAtTime(data[0], t); osc.frequency.exponentialRampToValueAtTime(data[1], t + data[2]);
-        gain.gain.setValueAtTime(.08, t); gain.gain.exponentialRampToValueAtTime(.001, t + data[2]);
-        osc.start(t); osc.stop(t + data[2]);
-      } catch (_) {}
-    }
-
-    async function shareResult() {
-      const text = `Я построил суши-башню на ${level - 1} этажей и набрал ${score} очков в Sushi Tower Stack!`;
-      try {
-        if (navigator.share) await navigator.share({ title: 'Sushi Tower Stack', text });
-        else if (navigator.clipboard) { await navigator.clipboard.writeText(text); shareStatus.textContent = 'Результат скопирован'; }
-        else { shareStatus.textContent = text; }
-      } catch (err) {
-        if (err.name !== 'AbortError') shareStatus.textContent = 'Не удалось поделиться';
-      }
-    }
-
-    function stopButtonEvent(event) { event.stopPropagation(); }
-    ['play', 'again', 'share'].forEach(id => {
-      document.getElementById(id).addEventListener('touchstart', stopButtonEvent, { passive: true });
-    });
-    document.getElementById('play').addEventListener('click', () => { unlockAudio(); resetGame(); });
-    document.getElementById('again').addEventListener('click', () => { unlockAudio(); resetGame(); });
-    document.getElementById('share').addEventListener('click', shareResult);
-
-    window.addEventListener('touchstart', event => {
-      if (gameState === 'playing') { event.preventDefault(); input(); }
-    }, { passive: false });
-    window.addEventListener('mousedown', event => {
-      if (event.button === 0 && event.target === canvas) input();
-    });
-    window.addEventListener('keydown', event => {
-      if (event.code === 'Space') { event.preventDefault(); input(); }
-    });
-    window.addEventListener('resize', resize, { passive: true });
-    document.addEventListener('visibilitychange', () => { lastTime = performance.now(); });
-
-    document.getElementById('startBest').textContent = best;
-    document.getElementById('startDaily').textContent = daily;
-    resize();
-    requestAnimationFrame(loop);
-  })();
-  </script>
+calc();
+</script>
 </body>
 </html>
